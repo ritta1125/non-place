@@ -139,6 +139,9 @@ body.flat #ports, body.flat #seat, body.flat .remote, body.flat #screen::after {
 .card .eyebrow { font-family: var(--mono); font-size: 16px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--dim); }
 .card h2 { margin: 0; font-family: var(--title); font-weight: var(--title-w); font-size: 120px; line-height: 0.95; letter-spacing: 0.02em; color: var(--title-fill); -webkit-text-stroke: calc(var(--title-stroke) * 6px) #000; paint-order: stroke fill; text-shadow: var(--title-glow); filter: var(--title-blur); }
 .card .by { font-family: var(--sans); font-size: 26px; color: var(--ink); }
+.card .stream { margin-top: 18px; pointer-events: auto; font: 700 14px/1 var(--sans); letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim); text-decoration: none; border-bottom: 1px solid currentColor; padding-bottom: 3px; }
+.card .stream:hover, .card .stream:focus-visible { color: var(--ink); outline: none; }
+.card:not(.show) .stream { pointer-events: none; }
 .card .cta { margin-top: 34px; padding: 10px 26px; border: 1px solid var(--line); border-radius: 999px; font-family: var(--mono); font-size: 15px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink); animation: blink 2.4s ease-in-out infinite; }
 .card .leg { margin-top: 18px; font-family: var(--mono); font-size: 18px; letter-spacing: 0.2em; color: var(--flown); }
 
@@ -193,12 +196,14 @@ body.flat #sub { bottom: 24vh; }
         <div class="by">R!iTTA</div>
         <div class="leg">PITTSBURGH (PIT) &nbsp;&rarr;&nbsp; SEOUL (ICN)</div>
         <div class="cta" id="cta">Click to board</div>
+        <a class="stream" href="https://distrokid.com/hyperfollow/ritta3/non-place" target="_blank" rel="noopener">Listen on streaming apps &#8599;</a>
       </div>
       <div id="arrive" class="card">
         <div class="eyebrow">Arrived at destination &middot; 목적지에 도착했습니다</div>
         <h2>SEOUL</h2>
         <div class="by">Incheon International Airport (ICN)</div>
         <div class="leg" id="arriveTime">Local time</div>
+        <a class="stream" href="https://distrokid.com/hyperfollow/ritta3/non-place" target="_blank" rel="noopener">Listen to NON-PLACE on streaming apps &#8599;</a>
       </div>
       <div id="volHud" class="hud"><span>VOLUME</span><div class="segs" id="volSegs"></div></div>
       <div id="announce" class="hud">
@@ -206,7 +211,7 @@ body.flat #sub { bottom: 24vh; }
         <div class="pa-bot">PA in Progress &middot; 안내 방송 중</div>
       </div>
 
-      <div id="event" class="hud panel">CROSSING TIMEZONE &middot; +1 DAY</div>
+      <div id="event" class="hud panel"></div>
 
       <div id="stats" class="hud panel">
         <div><div class="label">Time at destination</div><div class="v" id="tDest">--:--</div><div class="s" id="dDest">Seoul</div></div>
@@ -261,6 +266,39 @@ const CONFIG = {
   // cabin chime that plays after each song ends, before the next announcement + song start together
   // seconds = fallback length until the file loads (the real file length is used once it does)
   beep: { src: "songs/beep.m4a", seconds: 2 },
+  // in-flight events per track. at = how far into the song (0 = start, 1 = end)
+  // fx: "rumble" = short shake (seconds = how long). text shows as a banner on the screen
+  events: [
+    [ // 1 BAAM: boarding, airplane mode, taxi, takeoff roll
+      { at: 0.16, text: "BOARDING COMPLETE · 탑승 완료" },
+      { at: 0.34, text: "PLEASE SWITCH TO AIRPLANE MODE" },
+      { at: 0.52, text: "TAXIING TO RUNWAY 28R" },
+      { at: 0.74, text: "CLEARED FOR TAKEOFF" },
+      { at: 0.80, fx: "rumble", seconds: 9 },
+    ],
+    [ // 2 TakeOFF: lift off, city shrinks (camera pulls back), climb
+      { at: 0.03, text: "TAKEOFF · 이륙", fx: "rumble", seconds: 6 },
+      { at: 0.22, text: "LANDING GEAR UP" },
+      { at: 0.45, text: "CLIMBING · 상승 중" },
+      { at: 0.62, fx: "rumble", seconds: 4 },
+      { at: 0.82, text: "CRUISING ALTITUDE · SEATBELT SIGN OFF" },
+    ],
+    [ // 3 GMT++ (the date line banner fires on its own when the plane crosses it)
+      { at: 0.25, text: "SUNSET · LOCAL TIME CHANGING" },
+      { at: 0.80, text: "CABIN LIGHTS DIMMED" },
+    ],
+    [ // 4 No Horizon (the long turbulence is built in)
+      { at: 0.15, text: "SEATBELT SIGN ON · 좌석벨트 착용" },
+      { at: 0.40, text: "SEVERE TURBULENCE · RETURN TO YOUR SEAT" },
+      { at: 0.92, text: "NO HORIZON VISIBLE" },
+    ],
+    [ // 5 Reverse Homesickness: sunrise, descent, landing
+      { at: 0.15, text: "SUNRISE" },
+      { at: 0.45, text: "DESCENDING INTO INCHEON · 하강 중" },
+      { at: 0.70, text: "LANDING GEAR DOWN" },
+      { at: 0.90, text: "TOUCHDOWN", fx: "rumble", seconds: 3 },
+    ],
+  ],
   introSeconds: 0.6,                   // tiny pause after "Click to board" before the first beep (the title fades out meanwhile)
   subtitleHold: 1.1,                   // how long a finished line stays before the next one starts
   typeCharsPerSec: 22,
@@ -366,9 +404,17 @@ addEventListener("resize", fit); fit();
   const legLen = legs.map(g => g.surfaceDistance);
   const totalLen = legLen.reduce((a, b) => a + b, 0);
 
+  function camZoom(f) {
+    const e = x => { x = Cesium.Math.clamp(x, 0, 1); return x * x * (3 - 2 * x); };
+    if (S.stage !== "flight" || S.leg === 0) return 0.4;
+    if (S.leg === 1) return 0.4 + 0.6 * e(f / 0.85);
+    return 1;
+  }
   function heightAt(leg, f) {
     const c = CONFIG.cruiseMeters;
-    if (leg === 0 && f < 0.12) return c * Cesium.Math.clamp(f / 0.12, 0, 1);
+    const ease = x => { x = Cesium.Math.clamp(x, 0, 1); return x * x * (3 - 2 * x); };
+    if (leg === 0) return f < 0.8 ? 0 : 3048 * ease((f - 0.8) / 0.2);          // BAAM: taxi, lift off near the end, up to 10,000 ft
+    if (leg === 1) return 3048 + (c - 3048) * ease(f / 0.8);                     // TakeOFF: climb to cruise
     if (leg === N - 1 && f > 0.85) return c * Cesium.Math.clamp((1 - f) / 0.15, 0, 1);
     return c;
   }
@@ -495,7 +541,9 @@ addEventListener("resize", fit); fit();
             `${days[d.getUTCDay()]} ${d.getUTCDate()} ${d.toLocaleString("en", { month: "short", timeZone: "UTC" }).toUpperCase()}`];
   };
   const tzName = o => "UTC" + (o === 0 ? "" : (o > 0 ? "+" : "−") + Math.abs(o));
-  let eventTimer = 0;
+  let eventTimer = 0, rumbleUntil = 0;
+  const fired = new Set();
+  function showEvent(text, secs) { $("event").textContent = text; eventTimer = secs; }
 
   function update() {
     const f = legFrac(), c = cartoAt(S.leg, f);
@@ -525,11 +573,23 @@ addEventListener("resize", fit); fit();
       if (S.camHeading === null) S.camHeading = heading;
       const d = Cesium.Math.negativePiToPi(heading - S.camHeading);
       S.camHeading += d * 0.04;
-      viewer.camera.lookAt(posAt(S.leg, f), new Cesium.HeadingPitchRange(S.camHeading + S.yaw, Cesium.Math.toRadians(S.pitch), S.range));
+      viewer.camera.lookAt(posAt(S.leg, f), new Cesium.HeadingPitchRange(S.camHeading + S.yaw, Cesium.Math.toRadians(S.pitch), S.range * camZoom(f)));
     }
 
     // date line event
-    if (!S.dateline && lonU < -180) { S.dateline = true; eventTimer = 4.5; }
+    if (!S.dateline && lonU < -180) { S.dateline = true; showEvent("CROSSING TIMEZONE · +1 DAY", 4.5); }
+    // scheduled events for this song
+    if (S.stage === "flight" && !S.done) {
+      const p = S.tau < beepDur() ? -1 : trackProg();
+      (CONFIG.events[S.leg] || []).forEach((ev, k) => {
+        const id = S.leg + ":" + k;
+        if (p >= ev.at && !fired.has(id)) {
+          fired.add(id);
+          if (ev.text) showEvent(ev.text, ev.seconds && !ev.fx ? ev.seconds : 4);
+          if (ev.fx === "rumble") rumbleUntil = Math.max(rumbleUntil, performance.now() + (ev.seconds || 4) * 1000);
+        }
+      });
+    }
 
     // HUD text
     const localTz = Math.round(((lon + 540) % 360 - 180) / 15);
@@ -539,7 +599,10 @@ addEventListener("resize", fit); fit();
     $("tOrig").textContent = orig[0]; $("dOrig").textContent = "Pittsburgh · " + orig[1];
     const hgt = heightAt(S.leg, f);
     $("alt").textContent = Math.round(hgt * 3.28084).toLocaleString("en") + " ft";
-    $("spd").textContent = Math.round(hgt < 5 ? 0 : 280 + 625 * (hgt / CONFIG.cruiseMeters)) + " km/h";
+    const gs = S.leg === 0 && hgt < 5 ? (f < 0.02 ? 0 : f < 0.74 ? 28 : 28 + 250 * (f - 0.74) / 0.06)
+             : S.leg === N - 1 && hgt < 5 ? (S.done || f >= 0.999 ? 0 : 60)        // rolled out after touchdown
+             : 280 + 625 * (hgt / CONFIG.cruiseMeters);
+    $("spd").textContent = Math.round(gs) + " km/h";
     const flown = legLen.slice(0, S.leg).reduce((a, b) => a + b, 0) + legLen[S.leg] * f;
     $("dist").textContent = Math.round((totalLen - flown) / 1000).toLocaleString("en") + " km";
 
@@ -582,6 +645,10 @@ addEventListener("resize", fit); fit();
     if (S.stage === "flight" && S.leg === 3) {
       const A = annEnd(3), x = (S.tau - A * 0.5) / (legDur(3) - A * 0.5);
       if (x > 0 && x < 1) shake = CONFIG.turbulence * Math.sin(Math.PI * Math.pow(x, 1.6)) * (0.6 + 0.4 * Math.sin(now / 340));
+    }
+    if (now < rumbleUntil) {
+      const left = (rumbleUntil - now) / 1000;
+      shake = Math.max(shake, 0.45 * Math.min(1, left / 1.5) * (0.7 + 0.3 * Math.sin(now / 90)));
     }
     const sc = document.getElementById("pov");
     sc.style.transform = shake > 0.01 ? `scale(1.02) translate(${((Math.random() - 0.5) * 9 * shake).toFixed(1)}px, ${((Math.random() - 0.5) * 7 * shake).toFixed(1)}px) rotate(${((Math.random() - 0.5) * 0.35 * shake).toFixed(2)}deg)` : "";
@@ -632,6 +699,7 @@ addEventListener("resize", fit); fit();
     });
     renderTimeline(); jump(0, true); S.playing = false;
   }
+  document.querySelectorAll(".stream").forEach(a => a.addEventListener("click", e => e.stopPropagation()));
   // viewers on a website: one click on the intro starts the flight (and unlocks audio)
   document.addEventListener("click", () => { if (S.stage === "intro" && !S.playing) S.playing = true; });
   $("songPicker").addEventListener("change", e => loadFiles(e.target.files));
@@ -661,6 +729,7 @@ addEventListener("resize", fit); fit();
   function jump(leg, intro) {
     S.stage = intro ? "intro" : "flight"; S.introT = 0;
     S.leg = leg; S.tau = 0; S.done = false; S.dateline = leg > 2; S.camHeading = null; lastTyped = -1;
+    fired.clear(); rumbleUntil = 0; eventTimer = 0;
     audios.concat(beepAudio ? [beepAudio] : []).forEach(a => { if (a) { a.pause(); a.currentTime = 0; } });
   }
   for (let k = 0; k < 10; k++) $("volSegs").appendChild(document.createElement("i"));
