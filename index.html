@@ -83,6 +83,14 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--space)
 #seat .placard { position: absolute; top: 58px; left: 0; right: 0; text-align: center; font: 700 15px/1 "Arimo", Arial, sans-serif; letter-spacing: 0.32em; color: rgba(255,240,220,0.09); }
 body { -webkit-user-select: none; user-select: none; }
 
+/* IFE-style volume bar, pops up when you change volume */
+#volHud { left: 50%; bottom: 200px; transform: translateX(-50%); z-index: 16; display: flex; align-items: center; gap: 16px; padding: 14px 22px; border-radius: 6px; background: rgba(6,10,18,0.88); border: 1px solid var(--line); opacity: 0; transition: opacity .3s; }
+#volHud.show { opacity: 1; }
+#volHud span { font: 700 13px/1 var(--sans); letter-spacing: 0.18em; color: var(--dim); }
+#volHud .segs { display: flex; gap: 5px; }
+#volHud .segs i { display: block; width: 14px; height: 22px; border-radius: 2px; background: rgba(150,185,210,0.18); }
+#volHud .segs i.on { background: #5f8dff; }
+
 /* in flat mode the seat (and its remote) is gone, so a small back button shows when you move the mouse */
 #flatBack { position: fixed; z-index: 65; top: calc(18px + env(safe-area-inset-top, 0px)); right: calc(18px + env(safe-area-inset-right, 0px)); display: none; opacity: 0; transition: opacity .3s; }
 #flatBack svg { width: 48px; height: 48px; padding: 12px; background: rgba(8,10,16,0.8); }
@@ -166,7 +174,7 @@ body.flat #sub { bottom: 24vh; }
   <div id="rig">
     <div id="seat"><div class="placard">LIFE VEST UNDER YOUR SEAT &middot; 구명복은 좌석 밑에 있습니다</div></div>
     <div class="remote" id="remoteL"><button type="button" class="rb" data-act="prev" id="rb-prev" aria-label="Prev"><svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg><span>Prev</span></button><button type="button" class="rb" data-act="play" id="rb-play" aria-label="Play"><svg viewBox="0 0 24 24"><path class="ic-play" d="M8 5v14l11-7z"/><path class="ic-pause" d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg><span>Play</span></button><button type="button" class="rb" data-act="next" id="rb-next" aria-label="Next"><svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg><span>Next</span></button></div>
-    <div class="remote" id="remoteR"><button type="button" class="rb" data-act="view" id="rb-view" aria-label="View"><svg viewBox="0 0 24 24"><path d="M3 5h18v12H3zM5 7v8h14V7zM9 19h6v1.5H9z"/></svg><span>View</span></button><button type="button" class="rb" data-act="cam" id="rb-cam" aria-label="Cam"><svg viewBox="0 0 24 24"><path d="M12 4l2.5 5H9.5zM12 20l-2.5-5h5zM4 12l5-2.5v5zM20 12l-5 2.5v-5z"/><circle cx="12" cy="12" r="2"/></svg><span>Cam</span></button><button type="button" class="rb" data-act="full" id="rb-full" aria-label="Full"><svg viewBox="0 0 24 24"><path d="M4 4h6v2H6v4H4zM20 4v6h-2V6h-4V4zM4 20v-6h2v4h4v2zM20 20h-6v-2h4v-4h2z"/></svg><span>Full</span></button></div>
+    <div class="remote" id="remoteR"><button type="button" class="rb" data-act="volup" id="rb-volup" aria-label="Volume up"><svg viewBox="0 0 24 24"><path d="M3 9h4l5-4v14l-5-4H3zM17 11h2V9h2v2h2v2h-2v2h-2v-2h-2z"/></svg><span>Vol +</span></button><button type="button" class="rb" data-act="voldown" id="rb-voldown" aria-label="Volume down"><svg viewBox="0 0 24 24"><path d="M3 9h4l5-4v14l-5-4H3zM16 11h7v2h-7z"/></svg><span>Vol −</span></button><button type="button" class="rb" data-act="view" id="rb-view" aria-label="View"><svg viewBox="0 0 24 24"><path d="M3 5h18v12H3zM5 7v8h14V7zM9 19h6v1.5H9z"/></svg><span>View</span></button><button type="button" class="rb" data-act="cam" id="rb-cam" aria-label="Cam"><svg viewBox="0 0 24 24"><path d="M12 4l2.5 5H9.5zM12 20l-2.5-5h5zM4 12l5-2.5v5zM20 12l-5 2.5v-5z"/><circle cx="12" cy="12" r="2"/></svg><span>Cam</span></button><button type="button" class="rb" data-act="full" id="rb-full" aria-label="Full"><svg viewBox="0 0 24 24"><path d="M4 4h6v2H6v4H4zM20 4v6h-2V6h-4V4zM4 20v-6h2v4h4v2zM20 20h-6v-2h4v-4h2z"/></svg><span>Full</span></button></div>
     <div id="bezel">
       <div id="screen">
       <div id="globe"></div>
@@ -192,6 +200,7 @@ body.flat #sub { bottom: 24vh; }
         <div class="by">Incheon International Airport (ICN)</div>
         <div class="leg" id="arriveTime">Local time</div>
       </div>
+      <div id="volHud" class="hud"><span>VOLUME</span><div class="segs" id="volSegs"></div></div>
       <div id="announce" class="hud">
         <div class="pa-top">Passenger Announcement</div>
         <div class="pa-bot">PA in Progress &middot; 안내 방송 중</div>
@@ -252,7 +261,7 @@ const CONFIG = {
   // cabin chime that plays after each song ends, before the next announcement + song start together
   // seconds = fallback length until the file loads (the real file length is used once it does)
   beep: { src: "songs/beep.m4a", seconds: 2 },
-  introSeconds: 2,                     // title card before announcement 1
+  introSeconds: 0.6,                   // tiny pause after "Click to board" before the first beep (the title fades out meanwhile)
   subtitleHold: 1.1,                   // how long a finished line stays before the next one starts
   typeCharsPerSec: 22,
   slowdown: 0.25,                      // plane speed during announcements (1 = normal)
@@ -275,6 +284,10 @@ const CONFIG = {
   camPitchDeg: -24,                    // closer to 0 = more horizon / space
 };
 // ============================================================
+
+// volume (0 to 1), remembered between visits when the browser allows it
+let VOL = 0.8;
+try { const v = parseFloat(localStorage.getItem("np-vol")); if (v >= 0 && v <= 1) VOL = v; } catch (e) {}
 
 // title font picker
 const TITLE_FONTS = [
@@ -412,7 +425,7 @@ addEventListener("resize", fit); fit();
   const trackProg = () => Cesium.Math.clamp((S.tau - beepDur()) / trackDur(S.leg), 0, 1);
 
   function makeAudio(src) {
-    const a = new Audio(); a.preload = "auto"; a.src = src.startsWith("blob:") ? src : encodeURI(src).replace(/\+/g, "%2B");
+    const a = new Audio(); a.preload = "auto"; a.volume = VOL; a.src = src.startsWith("blob:") ? src : encodeURI(src).replace(/\+/g, "%2B");
     a.addEventListener("loadedmetadata", songStatus);
     a.addEventListener("error", () => console.warn("couldn't load song:", src));
     return a;
@@ -650,7 +663,18 @@ addEventListener("resize", fit); fit();
     S.leg = leg; S.tau = 0; S.done = false; S.dateline = leg > 2; S.camHeading = null; lastTyped = -1;
     audios.concat(beepAudio ? [beepAudio] : []).forEach(a => { if (a) { a.pause(); a.currentTime = 0; } });
   }
+  for (let k = 0; k < 10; k++) $("volSegs").appendChild(document.createElement("i"));
+  let volTm;
+  function setVol(v) {
+    VOL = Math.round(Cesium.Math.clamp(v, 0, 1) * 10) / 10;
+    audios.concat(beepAudio ? [beepAudio] : []).forEach(a => { if (a) a.volume = VOL; });
+    try { localStorage.setItem("np-vol", VOL); } catch (e) {}
+    [...$("volSegs").children].forEach((el, k) => el.classList.toggle("on", k < Math.round(VOL * 10)));
+    $("volHud").classList.add("show"); clearTimeout(volTm); volTm = setTimeout(() => $("volHud").classList.remove("show"), 1500);
+  }
   function act(a) {
+    if (a === "volup") return setVol(VOL + 0.1);
+    if (a === "voldown") return setVol(VOL - 0.1);
     if (a === "play") { if (S.done) jump(0, true); S.playing = !S.playing; }
     else if (a === "next") { if (S.stage === "intro") jump(0); else if (S.leg < N - 1) jump(S.leg + 1); }
     else if (a === "prev") { if (S.stage === "flight" && S.tau < 3 && S.leg > 0) jump(S.leg - 1); else jump(S.leg, S.leg === 0 && S.stage !== "flight"); }
@@ -676,6 +700,8 @@ addEventListener("resize", fit); fit();
     else if (k === "c") act("cam");
     else if (k === "f") act("full");
     else if (k === "arrowright") act("next");
+    else if (k === "arrowup") { e.preventDefault(); act("volup"); }
+    else if (k === "arrowdown") { e.preventDefault(); act("voldown"); }
     else if (k === "arrowleft") act("prev");
   });
 
