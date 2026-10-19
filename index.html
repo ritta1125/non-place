@@ -249,6 +249,9 @@ const CONFIG = {
   // title font for NON-PLACE / SEOUL. press T while it runs to try them all, then put the one you like here
   // options: "Arimo" (yellow cabin-screen glow), "IBM Plex Mono", "JetBrains Mono", "Space Mono", "Share Tech Mono", "Michroma", "Barlow Condensed", "B612 Mono"
   titleFont: "Arimo",
+  // cabin chime that plays after each song ends, before the next announcement + song start together
+  // seconds = fallback length until the file loads (the real file length is used once it does)
+  beep: { src: "songs/beep.m4a", seconds: 2 },
   introSeconds: 7,                     // title card before announcement 1
   subtitleHold: 1.1,                   // how long a finished line stays before the next one starts
   typeCharsPerSec: 22,
@@ -378,10 +381,14 @@ addEventListener("resize", fit); fit();
   const lineDur = l => l.length / CONFIG.typeCharsPerSec + CONFIG.subtitleHold;
   const annDur = i => Math.max(ann(i).seconds || 0, 0.6 + annLines(i).reduce((a, l) => a + lineDur(l), 0) + 1.2);
   const trackDur = i => (audios[i] && isFinite(audios[i].duration) && audios[i].duration > 0 ? audios[i].duration : CONFIG.tracks[i].seconds);
-  const legDur = i => annDur(i) + trackDur(i);
+  // each leg: [beep] -> [song starts, announcement typed over the first part of it] -> [rest of song]
+  const beepAudio = CONFIG.beep && CONFIG.beep.src ? makeAudio(CONFIG.beep.src) : null;
+  const beepDur = () => (beepAudio && isFinite(beepAudio.duration) && beepAudio.duration > 0 ? beepAudio.duration : (CONFIG.beep ? CONFIG.beep.seconds : 0));
+  const annEnd = i => beepDur() + Math.min(annDur(i), trackDur(i));   // when the subtitles finish
+  const legDur = i => beepDur() + trackDur(i);
   const smooth = x => x * x * (3 - 2 * x);
   function speed(i, tau) {
-    const A = annDur(i);
+    const A = annEnd(i);   // slow zone = beep + announcement
     if (tau >= A) return 1;
     const r = Math.min(2.5, A / 2), lo = CONFIG.slowdown;
     if (i === 0) return tau < A - r ? 0 : smooth((tau - (A - r)) / r);   // first announcement: parked at the gate
@@ -392,17 +399,17 @@ addEventListener("resize", fit); fit();
   const tables = [];
   function fracAt(i, tau) {   // distance fraction along the leg at time tau (integrates the speed curve)
     const D = legDur(i), n = 800;
-    if (!tables[i] || tables[i].D !== D) {
+    if (!tables[i] || tables[i].D !== D || tables[i].W !== annEnd(i)) {
       const F = new Float64Array(n + 1), h = D / n;
       for (let k = 1; k <= n; k++) F[k] = F[k - 1] + 0.5 * h * (speed(i, (k - 1) * h) + speed(i, k * h));
-      tables[i] = { D, F };
+      tables[i] = { D, F, W: annEnd(i) };
     }
     const F = tables[i].F, x = Cesium.Math.clamp(tau / D, 0, 1) * n, k = Math.min(Math.floor(x), n - 1);
     return (F[k] + (F[k + 1] - F[k]) * (x - k)) / F[n];
   }
   const legFrac = () => fracAt(S.leg, S.tau);
-  const phase = () => (S.done ? "done" : S.tau < annDur(S.leg) ? "announce" : "track");
-  const trackProg = () => Cesium.Math.clamp((S.tau - annDur(S.leg)) / trackDur(S.leg), 0, 1);
+  const phase = () => (S.done ? "done" : S.tau < beepDur() ? "beep" : S.tau < annEnd(S.leg) ? "announce" : "track");
+  const trackProg = () => Cesium.Math.clamp((S.tau - beepDur()) / trackDur(S.leg), 0, 1);
 
   function makeAudio(src) {
     const a = new Audio(); a.preload = "auto"; a.src = src.startsWith("blob:") ? src : encodeURI(src).replace(/\+/g, "%2B");
@@ -524,7 +531,7 @@ addEventListener("resize", fit); fit();
     $("dist").textContent = Math.round((totalLen - flown) / 1000).toLocaleString("en") + " km";
 
     const ph = phase(), tp = ph === "track" ? trackProg() : ph === "done" ? 1 : 0;
-    $("nowLabel").textContent = (ph === "announce" ? "Up next" : "Now playing") + ` · ${S.leg + 1} / ${N}`;
+    $("nowLabel").textContent = (ph === "beep" ? "Up next" : "Now playing") + ` · ${S.leg + 1} / ${N}`;
     $("nowTitle").textContent = CONFIG.tracks[S.leg].title;
     $("nowBar").style.width = tp * 100 + "%";
     [...tl.children].forEach((el, i) => {
@@ -534,12 +541,12 @@ addEventListener("resize", fit); fit();
 
     // typewriter caption
     const box = $("announce"), auto = S.stage === "flight" && ph === "announce";
-    box.classList.toggle("show", auto || S.annManual);
+    box.classList.toggle("show", (S.stage === "flight" && ph === "beep") || auto || S.annManual);   // PA box pops up with the chime
     $("sub").classList.toggle("show", auto);
     if (auto) {
       // find which subtitle line we're on, then how many of its letters are typed
       const lines = annLines(S.leg);
-      let t = S.tau - 0.6, li = 0;
+      let t = S.tau - beepDur() - 0.4, li = 0;
       while (li < lines.length - 1 && t >= lineDur(lines[li])) { t -= lineDur(lines[li]); li++; }
       const line = lines[li], n = Math.min(line.length, Math.max(0, Math.floor(t * CONFIG.typeCharsPerSec)));
       const key = S.leg * 1e6 + li * 1000 + n;
@@ -560,7 +567,7 @@ addEventListener("resize", fit); fit();
     // turbulence on leg 4 (No Horizon): builds through the song, settles at the end
     let shake = 0;
     if (S.stage === "flight" && S.leg === 3) {
-      const A = annDur(3), x = (S.tau - A * 0.5) / (legDur(3) - A * 0.5);
+      const A = annEnd(3), x = (S.tau - A * 0.5) / (legDur(3) - A * 0.5);
       if (x > 0 && x < 1) shake = CONFIG.turbulence * Math.sin(Math.PI * Math.pow(x, 1.6)) * (0.6 + 0.4 * Math.sin(now / 340));
     }
     const sc = document.getElementById("pov");
@@ -570,12 +577,12 @@ addEventListener("resize", fit); fit();
       S.introT += dt;
       if (S.introT >= CONFIG.introSeconds) S.stage = "flight";
     } else if (S.playing && !S.done) {
-      const A = annDur(S.leg), a = audios[S.leg];
+      const A = beepDur(), a = audios[S.leg];   // song starts right after the beep
       if (S.tau >= A && a && !a.paused) S.tau = A + a.currentTime;   // the song is the clock
       else S.tau += dt;
       if (a && a.ended) S.tau = legDur(S.leg);
       if (S.tau >= legDur(S.leg)) {
-        if (S.leg < N - 1) { S.tau -= legDur(S.leg); S.leg++; }
+        if (S.leg < N - 1) { S.tau -= legDur(S.leg); S.leg++; if (beepAudio) { beepAudio.pause(); beepAudio.currentTime = 0; } }
         else { S.tau = legDur(S.leg); S.done = true; S.playing = false; S.stage = "arrived"; }
       }
     }
@@ -586,12 +593,19 @@ addEventListener("resize", fit); fit();
   requestAnimationFrame(frame);
 
   function syncAudio() {
+    const live = S.playing && S.stage === "flight" && !S.done, B = beepDur();
     audios.forEach((a, i) => {
       if (!a) return;
-      const want = S.playing && S.stage === "flight" && !S.done && i === S.leg && S.tau >= annDur(i) && !a.ended;
-      if (want && a.paused) { a.currentTime = Math.max(0, S.tau - annDur(i)); a.play().catch(() => {}); }
+      const want = live && i === S.leg && S.tau >= B && !a.ended;
+      if (want && a.paused) { a.currentTime = Math.max(0, S.tau - B); a.play().catch(() => {}); }
       else if (!want && !a.paused) a.pause();
     });
+    // the chime only plays inside the beep window, so it never overlaps a song
+    if (beepAudio) {
+      const want = live && S.tau < B && !beepAudio.ended;
+      if (want && beepAudio.paused) { beepAudio.currentTime = Math.max(0, S.tau); beepAudio.play().catch(() => {}); }
+      else if (!want && !beepAudio.paused) beepAudio.pause();
+    }
   }
   function loadFiles(files) {
     const list = [...files].filter(f => f.type.startsWith("audio") || /\.(mp3|wav|m4a|aac|flac|ogg)$/i.test(f.name))
@@ -634,7 +648,7 @@ addEventListener("resize", fit); fit();
   function jump(leg, intro) {
     S.stage = intro ? "intro" : "flight"; S.introT = 0;
     S.leg = leg; S.tau = 0; S.done = false; S.dateline = leg > 2; S.camHeading = null; lastTyped = -1;
-    audios.forEach(a => { if (a) { a.pause(); a.currentTime = 0; } });
+    audios.concat(beepAudio ? [beepAudio] : []).forEach(a => { if (a) { a.pause(); a.currentTime = 0; } });
   }
   function act(a) {
     if (a === "play") { if (S.done) jump(0, true); S.playing = !S.playing; }
