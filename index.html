@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NON-PLACE Flight Map</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.145.0/Build/Cesium/Widgets/widgets.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=B612:wght@400;700&family=B612+Mono:wght@400;700&family=IBM+Plex+Mono:wght@600&family=JetBrains+Mono:wght@800&family=Space+Mono:wght@700&family=Share+Tech+Mono&family=Michroma&family=Arimo:wght@400;700&family=Barlow+Condensed:wght@600&family=Archivo+Narrow:wght@600;700&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/cesium@1.145.0/Build/Cesium/Cesium.js"></script>
+<style>
+/* IFE moving-map screen: globe full-bleed, glass HUD panels pinned to the edges */
+:root {
+  --space: #03060b;
+  --panel: rgba(7, 13, 21, 0.74);
+  --line: rgba(150, 185, 210, 0.22);
+  --ink: #e6edf2;
+  --dim: #8fa3b3;
+  --flown: #ffd24a;
+  --alert: #ffb02e;
+  /* real seatback IFE = plain Helvetica/Arial everywhere. Arimo is the free Arial twin,
+     one family across the whole screen is what makes it read as an actual airline UI */
+  --display: "Arimo", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --mono: "Arimo", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --title: "IBM Plex Mono", ui-monospace, monospace;   /* set from CONFIG.titleFont, press T to cycle */
+  --title-w: 600;
+  --title-fill: #e6edf2; --title-stroke: 1; --title-glow: none; --title-blur: none;
+  --sans: "Arimo", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --pa: "Archivo Narrow", "Arial Narrow", Arial, sans-serif;
+  color-scheme: dark;
+}
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--space); color: var(--ink); font-family: var(--sans); }
+#globe { position: absolute; inset: 0; }
+
+/* POV: the seatback in front of you, screen tilted like you're slouched in a window seat */
+/* POV: eye level, dead center, the seatback in front of you in a dim cabin */
+#pov { position: fixed; inset: 0; overflow: hidden;
+  background:
+    radial-gradient(ellipse 60% 22% at 50% 0%, rgba(255,214,160,0.16), transparent 70%),
+    linear-gradient(180deg, #1c1813 0%, #0d0c0b 35%, #060606 100%); }
+#pov::after { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; background: #000; opacity: calc(var(--night, 0) * 0.4); }
+#rig { position: absolute; z-index: 1; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(var(--s, 0.7)); animation: sway 9s ease-in-out infinite; }
+@keyframes sway {
+  0%, 100% { transform: translate(-50%, -50%) scale(var(--s, 0.7)) translateY(0); }
+  50% { transform: translate(-50%, -50%) scale(var(--s, 0.7)) translateY(-5px); }
+}
+/* seatback shell: big soft rounded top, runs off the bottom of the frame */
+#seat { position: absolute; top: -150px; left: -190px; right: -190px; bottom: -520px; border-radius: 230px 230px 60px 60px;
+  background: radial-gradient(ellipse 80% 55% at 50% 30%, #2c2a28 0%, #1f1e1c 55%, #151413 100%);
+  box-shadow: inset 0 3px 0 rgba(255,235,210,0.06), inset 0 -40px 80px rgba(0,0,0,0.5), 0 0 120px rgba(0,0,0,0.8);
+  filter: brightness(calc(1 - var(--night, 0) * 0.45)); }
+#bezel { position: relative; padding: 30px; border-radius: 44px;
+  background: linear-gradient(180deg, #0f1012 0%, #08090a 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 2px 0 rgba(255,255,255,0.03); }
+#screen { position: relative; width: 1600px; height: 900px; overflow: hidden; border-radius: 14px; background: var(--space); }
+#screen::after { content: ""; position: absolute; inset: 0; z-index: 20; pointer-events: none;
+  background:
+    linear-gradient(170deg, rgba(255,255,255,0.05) 0%, transparent 30%),
+    repeating-linear-gradient(90deg, rgba(0,0,0,0.08) 0 1px, transparent 1px 3px); }
+/* the little blue-lit controls under the screen */
+#ports { position: absolute; left: 0; right: 0; top: calc(100% + 26px); height: 140px; pointer-events: none; }
+#ports i { position: absolute; display: block; }
+#ports .home { left: 50%; top: 0; width: 34px; height: 34px; margin-left: -17px; border-radius: 50%; border: 3px solid #3d7bff; box-shadow: 0 0 14px rgba(61,123,255,0.7); background: #0b1020; }
+#ports .home::after { content: ""; position: absolute; inset: 8px; border-radius: 50%; background: #2f63e8; }
+#ports .jack { left: 14%; top: 52px; width: 40px; height: 16px; border-radius: 10px; border: 3px solid #3d7bff; box-shadow: 0 0 12px rgba(61,123,255,0.8); }
+#ports .jack2 { left: calc(14% + 58px); top: 52px; width: 40px; height: 16px; border-radius: 10px; border: 3px solid #3d7bff; box-shadow: 0 0 12px rgba(61,123,255,0.8); }
+#ports .usb { left: calc(14% + 150px); top: 44px; width: 26px; height: 34px; border-radius: 4px; border: 3px solid #3d7bff; box-shadow: 0 0 12px rgba(61,123,255,0.8); }
+
+/* seatback remote: two slim panels either side of the screen, blue-lit like the ports */
+.remote { position: absolute; top: 50%; transform: translateY(-50%); width: 96px; padding: 26px 0; border-radius: 48px; display: flex; flex-direction: column; align-items: center; gap: 22px;
+  background: linear-gradient(180deg, #121314 0%, #0a0b0c 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), inset 0 -2px 6px rgba(0,0,0,0.7), 0 2px 0 rgba(255,255,255,0.03); }
+#remoteL { right: calc(100% + 46px); }
+#remoteR { left: calc(100% + 46px); }
+.rb { all: unset; box-sizing: border-box; cursor: pointer; display: grid; justify-items: center; gap: 7px; }
+.rb svg { width: 58px; height: 58px; padding: 15px; box-sizing: border-box; border-radius: 50%; fill: #5f8dff;
+  background: radial-gradient(circle at 50% 35%, #161b26, #0b0d12); border: 2px solid #26365e; box-shadow: 0 0 10px rgba(61,123,255,0.25); transition: box-shadow .15s, border-color .15s, fill .15s; }
+.rb span { font: 700 11px/1 "Arimo", Arial, sans-serif; letter-spacing: 0.16em; text-transform: uppercase; color: #4f618a; }
+.rb:hover svg, .rb:focus-visible svg { border-color: #3d7bff; fill: #9bb8ff; box-shadow: 0 0 16px rgba(61,123,255,0.6); }
+.rb:active svg { transform: scale(0.94); }
+.rb.on svg { border-color: #3d7bff; fill: #cfe0ff; box-shadow: 0 0 18px rgba(61,123,255,0.7); }
+.rb .ic-pause { display: none; }
+.rb.playing .ic-play { display: none; }
+.rb.playing .ic-pause { display: inline; }
+#seat .placard { position: absolute; top: 58px; left: 0; right: 0; text-align: center; font: 700 15px/1 "Arimo", Arial, sans-serif; letter-spacing: 0.32em; color: rgba(255,240,220,0.09); }
+body { -webkit-user-select: none; user-select: none; }
+
+/* flat mode (P): just the screen, full window */
+body.flat #rig { transform: translate(-50%, -50%) scale(var(--s, 1)); animation: none; }
+body.flat #bezel { padding: 0; border-radius: 0; box-shadow: none; background: none; }
+body.flat #screen { border-radius: 0; }
+body.flat #ports, body.flat #seat, body.flat .remote, body.flat #screen::after { display: none; }
+.cesium-viewer-bottom, .cesium-widget-credits { display: none !important; }
+
+.hud { position: absolute; z-index: 5; pointer-events: none; }
+.panel { background: var(--panel); border: 1px solid var(--line); backdrop-filter: blur(6px); border-radius: 6px; }
+.label { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+#brand { top: 24px; left: 28px; }
+#brand h1 { margin: 0; font-family: var(--title); font-weight: var(--title-w); font-size: 72px; letter-spacing: 0.02em; color: var(--title-fill); -webkit-text-stroke: calc(var(--title-stroke) * 4px) #000; paint-order: stroke fill; text-shadow: var(--title-glow); filter: var(--title-blur); line-height: 0.9; }
+#brand .route { margin-top: 8px; font-family: var(--mono); font-size: 14px; letter-spacing: 0.2em; color: var(--dim); }
+
+#now { top: 24px; right: 28px; padding: 14px 18px; min-width: 260px; display: grid; gap: 6px; }
+#now .title { font-family: var(--display); font-size: 26px; font-weight: 400; letter-spacing: 0.04em; }
+.bar { height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.bar > i { display: block; height: 100%; width: 0; background: var(--flown); }
+
+#stats { left: 28px; right: 28px; bottom: 24px; padding: 14px 20px; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px 20px; }
+#stats .v { font-family: var(--mono); font-weight: 700; font-size: 22px; font-variant-numeric: tabular-nums; margin-top: 4px; white-space: nowrap; }
+#stats .s { font-family: var(--mono); font-size: 11px; color: var(--dim); margin-top: 2px; }
+#timeline { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+#timeline div { display: grid; gap: 5px; }
+#timeline span { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; color: var(--dim); }
+#timeline div.on span { color: var(--ink); }
+
+/* cabin PA screen: blue title bar over a pale status bar, flat, no glow */
+#announce { top: 15%; left: 50%; transform: translateX(-50%); width: min(620px, calc(100vw - 56px)); box-sizing: border-box; display: none; flex-direction: column; border: 2px solid #2a3db8; border-radius: 3px; overflow: hidden; background: #eef0f4; z-index: 6; }
+#announce.show { display: flex; }
+#announce .pa-top { padding: 10px 20px 9px; background: linear-gradient(180deg, #5770ee 0%, #2c42cf 48%, #1f32b3 100%); border-bottom: 1px solid #16248a; color: #fff; font-family: var(--pa); font-weight: 700; font-size: 34px; letter-spacing: -0.01em; text-align: center; }
+#announce .pa-bot { padding: 7px 20px 8px; background: linear-gradient(180deg, #ffffff 0%, #e3e6ee 100%); color: #0e1a52; font-family: var(--pa); font-weight: 700; font-size: 22px; text-align: center; }
+/* intro + arrival cards, full-screen on the IFE */
+.card { position: absolute; inset: 0; z-index: 15; display: grid; place-content: center; justify-items: center; gap: 14px; text-align: center; pointer-events: none;
+  background: radial-gradient(ellipse at 50% 45%, rgba(10,18,30,0.86) 0%, rgba(3,6,11,0.97) 75%); opacity: 0; transition: opacity 1.4s ease; }
+.card.show { opacity: 1; }
+#arrive { background: radial-gradient(ellipse at 50% 50%, rgba(3,6,11,0.55) 0%, rgba(3,6,11,0.85) 80%); }
+.card .eyebrow { font-family: var(--mono); font-size: 16px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--dim); }
+.card h2 { margin: 0; font-family: var(--title); font-weight: var(--title-w); font-size: 120px; line-height: 0.95; letter-spacing: 0.02em; color: var(--title-fill); -webkit-text-stroke: calc(var(--title-stroke) * 6px) #000; paint-order: stroke fill; text-shadow: var(--title-glow); filter: var(--title-blur); }
+.card .by { font-family: var(--sans); font-size: 26px; color: var(--ink); }
+.card .cta { margin-top: 34px; padding: 10px 26px; border: 1px solid var(--line); border-radius: 999px; font-family: var(--mono); font-size: 15px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink); animation: blink 2.4s ease-in-out infinite; }
+.card .leg { margin-top: 18px; font-family: var(--mono); font-size: 18px; letter-spacing: 0.2em; color: var(--flown); }
+
+/* film subtitle: plain white bold, bottom-center of the frame */
+#sub { position: fixed; left: 50%; bottom: 4.5vh; z-index: 55; transform: translateX(-50%); width: min(84vw, 1300px); text-align: center;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 700; font-size: clamp(18px, 2.2vw, 40px); line-height: 1.3;
+  color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.85); white-space: pre-line; pointer-events: none; opacity: 0; transition: opacity .25s; }
+#sub.show { opacity: 1; }
+#capOff { visibility: hidden; }
+body.flat #sub { bottom: 24vh; }
+
+/* film grain over everything */
+#grain { position: fixed; inset: -50%; z-index: 50; pointer-events: none; opacity: 0.16; mix-blend-mode: overlay; background-size: 220px 220px; }
+#vignette { position: fixed; inset: 0; z-index: 49; pointer-events: none; background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.35) 100%); }
+@keyframes blink { 50% { opacity: 0.15; } }
+
+#event { top: 30%; left: 50%; transform: translateX(-50%); padding: 10px 22px; font-family: var(--mono); font-size: 14px; letter-spacing: 0.18em; color: var(--flown); white-space: nowrap; opacity: 0; transition: opacity .6s; }
+#event.show { opacity: 1; }
+
+#keys { position: fixed; z-index: 60; top: 50%; left: 28px; transform: translateY(-50%); padding: 12px 16px; font-family: var(--mono); font-size: 12px; line-height: 1.8; color: var(--dim); }
+#keys kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin-right: 8px; border: 1px solid var(--line); border-radius: 3px; color: var(--ink); text-align: center; font-family: inherit; }
+#keys.hide { display: none; }
+
+@media (max-width: 760px) { #stats { grid-template-columns: repeat(3, minmax(0, 1fr)); } #now { min-width: 0; } }
+@media (prefers-reduced-motion: reduce) { #rig { animation: none; } }
+#fontToast { position: fixed; z-index: 70; top: 20px; left: 50%; transform: translateX(-50%); padding: 8px 16px; border-radius: 6px; background: rgba(0,0,0,0.75); color: #fff; font: 14px/1.2 ui-monospace, Menlo, monospace; opacity: 0; transition: opacity .3s; pointer-events: none; }
+#fontToast.show { opacity: 1; }
+#keys .songs { color: var(--flown); }
+</style>
+</head>
+<body>
+<div id="pov">
+  <div id="rig">
+    <div id="seat"><div class="placard">LIFE VEST UNDER YOUR SEAT &middot; 구명복은 좌석 밑에 있습니다</div></div>
+    <div class="remote" id="remoteL"><button type="button" class="rb" data-act="prev" id="rb-prev" aria-label="Prev"><svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg><span>Prev</span></button><button type="button" class="rb" data-act="play" id="rb-play" aria-label="Play"><svg viewBox="0 0 24 24"><path class="ic-play" d="M8 5v14l11-7z"/><path class="ic-pause" d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg><span>Play</span></button><button type="button" class="rb" data-act="next" id="rb-next" aria-label="Next"><svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg><span>Next</span></button></div>
+    <div class="remote" id="remoteR"><button type="button" class="rb" data-act="view" id="rb-view" aria-label="View"><svg viewBox="0 0 24 24"><path d="M3 5h18v12H3zM5 7v8h14V7zM9 19h6v1.5H9z"/></svg><span>View</span></button><button type="button" class="rb" data-act="cam" id="rb-cam" aria-label="Cam"><svg viewBox="0 0 24 24"><path d="M12 4l2.5 5H9.5zM12 20l-2.5-5h5zM4 12l5-2.5v5zM20 12l-5 2.5v-5z"/><circle cx="12" cy="12" r="2"/></svg><span>Cam</span></button><button type="button" class="rb" data-act="full" id="rb-full" aria-label="Full"><svg viewBox="0 0 24 24"><path d="M4 4h6v2H6v4H4zM20 4v6h-2V6h-4V4zM4 20v-6h2v4h4v2zM20 20h-6v-2h4v-4h2z"/></svg><span>Full</span></button></div>
+    <div id="bezel">
+      <div id="screen">
+      <div id="globe"></div>
+
+      <div id="brand" class="hud"><h1 id="albumName">NON-PLACE</h1><div class="route">PIT &rarr; ICN</div></div>
+
+      <div id="now" class="hud panel">
+        <div class="label" id="nowLabel">Now playing &middot; 1 / 5</div>
+        <div class="title" id="nowTitle">Track 1</div>
+        <div class="bar"><i id="nowBar"></i></div>
+      </div>
+
+      <div id="intro" class="card show">
+        <div class="eyebrow">Welcome aboard &middot; 탑승을 환영합니다</div>
+        <h2>NON-PLACE</h2>
+        <div class="by">R!iTTA</div>
+        <div class="leg">PITTSBURGH (PIT) &nbsp;&rarr;&nbsp; SEOUL (ICN)</div>
+        <div class="cta" id="cta">Click to board</div>
+      </div>
+      <div id="arrive" class="card">
+        <div class="eyebrow">Arrived at destination &middot; 목적지에 도착했습니다</div>
+        <h2>SEOUL</h2>
+        <div class="by">Incheon International Airport (ICN)</div>
+        <div class="leg" id="arriveTime">Local time</div>
+      </div>
+      <div id="announce" class="hud">
+        <div class="pa-top">Passenger Announcement</div>
+        <div class="pa-bot">PA in Progress &middot; 안내 방송 중</div>
+      </div>
+
+      <div id="event" class="hud panel">CROSSING TIMEZONE &middot; +1 DAY</div>
+
+      <div id="stats" class="hud panel">
+        <div><div class="label">Time at destination</div><div class="v" id="tDest">--:--</div><div class="s" id="dDest">Seoul</div></div>
+        <div><div class="label">Local time</div><div class="v" id="tLocal">--:--</div><div class="s" id="dLocal">UTC</div></div>
+        <div><div class="label">Time at origin</div><div class="v" id="tOrig">--:--</div><div class="s" id="dOrig">Pittsburgh</div></div>
+        <div><div class="label">Altitude</div><div class="v" id="alt">0 ft</div><div class="s">&nbsp;</div></div>
+        <div><div class="label">Ground speed</div><div class="v" id="spd">0 km/h</div><div class="s">&nbsp;</div></div>
+        <div><div class="label">Distance to dest.</div><div class="v" id="dist">-- km</div><div class="s">&nbsp;</div></div>
+        <div id="timeline"></div>
+      </div>
+      </div>
+      <div id="ports"><i class="home"></i><i class="jack"></i><i class="jack2"></i><i class="usb"></i></div>
+    </div>
+  </div>
+</div>
+<div id="vignette"></div>
+<div id="fontToast"></div>
+<div id="sub"><span id="capOn"></span><span id="capOff"></span></div>
+<div id="grain"></div>
+<input type="file" id="songPicker" accept="audio/*" multiple hidden>
+
+</div>
+
+<script>
+// ============================================================
+//  EDIT THESE FOR YOUR VIDEO
+// ============================================================
+const CONFIG = {
+  album: "NON-PLACE",
+  // src: path to the song next to this html (ex "songs/01.mp3"), or leave "" and press O / drag files in
+  // seconds: only used when there's no song loaded. with a song, the song length is used
+  tracks: [
+    { title: "BAAM",                 src: "01_BAAM.m4a", seconds: 97 },
+    { title: "TakeOFF",              src: "02_Takeoff.m4a", seconds: 100 },
+    { title: "GMT++",                src: "03_GMT++.m4a", seconds: 194 },   // date line + day -> night happen here
+    { title: "No Horizon",           src: "04_No Horizon.m4a", seconds: 102 },
+    { title: "Reverse Homesickness", src: "05_Reverse Homesickness.m4a", seconds: 105 },
+  ],
+  // one cabin announcement before each track, typed out as subtitles (no audio)
+  // each "\n" starts a new subtitle line (the previous one clears). seconds = minimum length, it auto-extends to fit
+  announcements: [
+    { text: "Welcome aboard.\nThis plane will carry you across timezones.\nTake your time finding your seat.\nYou may look back once.", seconds: 0 },
+    { text: "We ask that you please fasten your seatbelts at this time.\nThe city is getting smaller. This is normal.\nTry to remember it at this size.", seconds: 0 },
+    { text: "Local time is no longer something we can tell you.\nSomewhere ahead, it's already tomorrow.\nSomewhere behind you, it's still yesterday.\nIf you cannot sleep, you are not alone.\nEveryone here is between two places.", seconds: 0 },
+    { text: "Ladies and gentlemen, we're experiencing some turbulence.\nPlease return to your seats and fasten your seatbelts.\nIf you were dreaming, this is the part where you wake up.", seconds: 0 },
+    { text: "Please fasten your seat belts and prepare for landing.\nWelcome home.\nLocal time is the same as when you left.\nPlease remain seated until you feel like you've arrived.\nYou may now turn off airplane mode.", seconds: 0 },
+  ],
+  // title font for NON-PLACE / SEOUL. press T while it runs to try them all, then put the one you like here
+  // options: "Arimo" (yellow cabin-screen glow), "IBM Plex Mono", "JetBrains Mono", "Space Mono", "Share Tech Mono", "Michroma", "Barlow Condensed", "B612 Mono"
+  titleFont: "Arimo",
+  introSeconds: 7,                     // title card before announcement 1
+  subtitleHold: 1.1,                   // how long a finished line stays before the next one starts
+  typeCharsPerSec: 22,
+  slowdown: 0.25,                      // plane speed during announcements (1 = normal)
+  // 6 points = 5 legs. leg 3 crosses the date line
+  route: [
+    { lon: -80.2329, lat: 40.4919, label: "PITTSBURGH" },
+    { lon: -97.0,    lat: 54.0 },
+    { lon: -145.0,   lat: 63.0 },
+    { lon: 172.0,    lat: 58.0 },
+    { lon: 142.0,    lat: 44.0 },
+    { lon: 126.4407, lat: 37.4602, label: "SEOUL" },
+  ],
+  // sun time under the plane at the start/end of each leg (24+ = next night)
+  // GMT++: 14:00 -> 01:00 (day to night fast) · No Horizon: 02:00 -> 04:30 (darkest hour) · Reverse Homesickness: 04:30 -> 07:00 (sunrise)
+  sunHours: [[11, 12.5], [12.5, 14], [14, 25], [25, 28.5], [28.5, 31]],
+  turbulence: 1,                       // screen shake during No Horizon (0 = off, 2 = rough)
+  date: "2026-09-21",                  // equinox-ish so day/night looks even
+  cruiseMeters: 11000,
+  camRangeMeters: 3800000,             // smaller = closer to the plane
+  camPitchDeg: -24,                    // closer to 0 = more horizon / space
+};
+// ============================================================
+
+// title font picker
+const TITLE_FONTS = [
+  ["Arimo", 700, "old cabin screen, yellow LCD glow", "glow"],
+  ["IBM Plex Mono", 600, "clean engineering mono"],
+  ["JetBrains Mono", 800, "sharp, heavy, techy"],
+  ["Space Mono", 700, "retro-futuristic mono"],
+  ["Share Tech Mono", 400, "narrow, terminal / avionics"],
+  ["Michroma", 400, "wide aerospace display"],
+  ["Barlow Condensed", 600, "airport signage, condensed"],
+  ["B612 Mono", 700, "the Airbus cockpit one"],
+];
+let titleIdx = Math.max(0, TITLE_FONTS.findIndex(f => f[0] === CONFIG.titleFont));
+function setTitleFont(i, toast) {
+  const [name, w, note, look] = TITLE_FONTS[i], r = document.documentElement.style, glow = look === "glow";
+  r.setProperty("--title", `"${name}", ${glow ? "Arial, Helvetica, sans-serif" : "ui-monospace, monospace"}`);
+  r.setProperty("--title-w", w);
+  // glow look: amber-yellow Arial-style caps with a soft LCD bloom, no outline
+  r.setProperty("--title-fill", glow ? "#f2e34c" : "#e6edf2");
+  r.setProperty("--title-stroke", glow ? 0 : 1);
+  r.setProperty("--title-glow", glow ? "0 0 6px rgba(242,227,76,0.75), 0 0 18px rgba(242,180,40,0.45), 0 0 40px rgba(242,160,30,0.25)" : "none");
+  r.setProperty("--title-blur", glow ? "blur(0.4px)" : "none");
+  if (toast) { const t = document.getElementById("fontToast"); t.textContent = `title font: ${name} (${note})`; t.classList.add("show"); clearTimeout(setTitleFont.tm); setTitleFont.tm = setTimeout(() => t.classList.remove("show"), 2200); }
+}
+setTitleFont(titleIdx, false);
+addEventListener("keydown", e => { if (e.key.toLowerCase() === "t") { titleIdx = (titleIdx + 1) % TITLE_FONTS.length; setTitleFont(titleIdx, true); } });
+
+// the screen renders at 1600x900 and gets scaled to the window
+function fit() {
+  const flat = document.body.classList.contains("flat");
+  const s = flat ? Math.min(innerWidth / 1600, innerHeight / 900) : Math.min(innerWidth * 0.86 / 1660, innerHeight * 0.80 / 960);
+  document.documentElement.style.setProperty("--s", s.toFixed(4));
+}
+addEventListener("resize", fit); fit();
+
+// film grain: a few random noise tiles flipped ~24 times a second
+(function grain() {
+  const el = document.getElementById("grain"), tiles = [];
+  for (let t = 0; t < 6; t++) {
+    const c = document.createElement("canvas"); c.width = c.height = 220;
+    const g = c.getContext("2d"), img = g.createImageData(220, 220);
+    for (let i = 0; i < img.data.length; i += 4) { const v = Math.random() * 255; img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 255; }
+    g.putImageData(img, 0, 0); tiles.push(`url(${c.toDataURL()})`);
+  }
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let k = 0;
+  const step = () => { el.style.backgroundImage = tiles[k++ % tiles.length]; el.style.backgroundPosition = `${(Math.random() * 220) | 0}px ${(Math.random() * 220) | 0}px`; };
+  step(); if (!still) setInterval(step, 42);
+})();
+
+(async function () {
+  document.getElementById("albumName").textContent = CONFIG.album;
+  try { await document.fonts.load("700 16px 'Arimo'"); } catch (e) {}
+
+  const viewer = new Cesium.Viewer("globe", {
+    baseLayer: Cesium.ImageryLayer.fromProviderAsync(
+      Cesium.TileMapServiceImageryProvider.fromUrl(Cesium.buildModuleUrl("Assets/Textures/NaturalEarthII"))
+    ),
+    animation: false, timeline: false, geocoder: false, homeButton: false,
+    sceneModePicker: false, baseLayerPicker: false, navigationHelpButton: false,
+    fullscreenButton: false, infoBox: false, selectionIndicator: false,
+  });
+  const scene = viewer.scene, globe = scene.globe;
+  globe.enableLighting = true;
+  globe.dynamicAtmosphereLighting = true;
+  globe.dynamicAtmosphereLightingFromSun = true;
+  globe.lightingFadeOutDistance = 1;      // apply sun shading at every zoom level
+  globe.lightingFadeInDistance = 2;
+  viewer.clock.shouldAnimate = false;
+
+  // ---------- route geometry ----------
+  const R = CONFIG.route, N = R.length - 1, SAMPLES = 120;
+  const carto = R.map(p => Cesium.Cartographic.fromDegrees(p.lon, p.lat));
+  const legs = [];
+  for (let i = 0; i < N; i++) legs.push(new Cesium.EllipsoidGeodesic(carto[i], carto[i + 1]));
+  const legLen = legs.map(g => g.surfaceDistance);
+  const totalLen = legLen.reduce((a, b) => a + b, 0);
+
+  function heightAt(leg, f) {
+    const c = CONFIG.cruiseMeters;
+    if (leg === 0 && f < 0.12) return c * Cesium.Math.clamp(f / 0.12, 0, 1);
+    if (leg === N - 1 && f > 0.85) return c * Cesium.Math.clamp((1 - f) / 0.15, 0, 1);
+    return c;
+  }
+  function cartoAt(leg, f) { return legs[leg].interpolateUsingFraction(Cesium.Math.clamp(f, 0, 1)); }
+  function posAt(leg, f) {
+    const c = cartoAt(leg, f);
+    return Cesium.Cartesian3.fromRadians(c.longitude, c.latitude, heightAt(leg, f));
+  }
+  // longitude without the +180/-180 jump, so clocks keep counting forward across the date line
+  function unwrappedLon(leg, lonDeg) { return (leg >= 2 && lonDeg > 0) ? lonDeg - 360 : lonDeg; }
+
+  const legPts = legs.map((_, i) => Array.from({ length: SAMPLES + 1 }, (_, k) => posAt(i, k / SAMPLES)));
+  const fullRoute = legPts.flatMap((pts, i) => (i ? pts.slice(1) : pts));
+
+  // ---------- state ----------
+  const S = { stage: "intro", introT: 0, leg: 0, tau: 0, done: false, playing: false, annManual: false, follow: true, dateline: false, camHeading: null,
+             yaw: 0, pitch: CONFIG.camPitchDeg, range: CONFIG.camRangeMeters };
+
+  // each leg = [announcement (slow)] + [song (normal speed)]. leg 1 has no announcement
+  const audios = CONFIG.tracks.map(t => (t.src ? makeAudio(t.src) : null));
+  const ann = i => CONFIG.announcements[i] || { text: "", seconds: 8 };
+  const annLines = i => ann(i).text.split("\n");
+  const lineDur = l => l.length / CONFIG.typeCharsPerSec + CONFIG.subtitleHold;
+  const annDur = i => Math.max(ann(i).seconds || 0, 0.6 + annLines(i).reduce((a, l) => a + lineDur(l), 0) + 1.2);
+  const trackDur = i => (audios[i] && isFinite(audios[i].duration) && audios[i].duration > 0 ? audios[i].duration : CONFIG.tracks[i].seconds);
+  const legDur = i => annDur(i) + trackDur(i);
+  const smooth = x => x * x * (3 - 2 * x);
+  function speed(i, tau) {
+    const A = annDur(i);
+    if (tau >= A) return 1;
+    const r = Math.min(2.5, A / 2), lo = CONFIG.slowdown;
+    if (i === 0) return tau < A - r ? 0 : smooth((tau - (A - r)) / r);   // first announcement: parked at the gate
+    if (tau < r) return 1 + (lo - 1) * smooth(tau / r);            // ease down
+    if (tau > A - r) return lo + (1 - lo) * smooth((tau - (A - r)) / r); // ease back up
+    return lo;
+  }
+  const tables = [];
+  function fracAt(i, tau) {   // distance fraction along the leg at time tau (integrates the speed curve)
+    const D = legDur(i), n = 800;
+    if (!tables[i] || tables[i].D !== D) {
+      const F = new Float64Array(n + 1), h = D / n;
+      for (let k = 1; k <= n; k++) F[k] = F[k - 1] + 0.5 * h * (speed(i, (k - 1) * h) + speed(i, k * h));
+      tables[i] = { D, F };
+    }
+    const F = tables[i].F, x = Cesium.Math.clamp(tau / D, 0, 1) * n, k = Math.min(Math.floor(x), n - 1);
+    return (F[k] + (F[k + 1] - F[k]) * (x - k)) / F[n];
+  }
+  const legFrac = () => fracAt(S.leg, S.tau);
+  const phase = () => (S.done ? "done" : S.tau < annDur(S.leg) ? "announce" : "track");
+  const trackProg = () => Cesium.Math.clamp((S.tau - annDur(S.leg)) / trackDur(S.leg), 0, 1);
+
+  function makeAudio(src) {
+    const a = new Audio(); a.preload = "auto"; a.src = src.startsWith("blob:") ? src : encodeURI(src).replace(/\+/g, "%2B");
+    a.addEventListener("loadedmetadata", songStatus);
+    a.addEventListener("error", () => console.warn("couldn't load song:", src));
+    return a;
+  }
+  function songStatus() {
+    const ok = audios.filter(a => a && isFinite(a.duration)).length;
+    console.log(`${ok} / ${N} songs loaded`);
+  }
+
+  // ---------- entities ----------
+  viewer.entities.add({ polyline: {   // whole route, dashed
+    positions: fullRoute, width: 2, arcType: Cesium.ArcType.NONE,
+    material: new Cesium.PolylineDashMaterialProperty({ color: Cesium.Color.WHITE.withAlpha(0.55), dashLength: 14 }),
+  }});
+  viewer.entities.add({ polyline: {   // flown part, solid
+    positions: new Cesium.CallbackProperty(() => {
+      const f = legFrac(), k = Math.floor(f * SAMPLES);
+      const done = legPts.slice(0, S.leg).flatMap(p => p);
+      return done.concat(legPts[S.leg].slice(0, k + 1), [posAt(S.leg, f)]);
+    }, false),
+    width: 4, arcType: Cesium.ArcType.NONE,
+    material: new Cesium.PolylineGlowMaterialProperty({ color: Cesium.Color.fromCssColorString("#ffd24a"), glowPower: 0.25 }),
+  }});
+  viewer.entities.add({ polyline: {   // timezone line (date line)
+    positions: Cesium.Cartesian3.fromDegreesArrayHeights([180, 48, 15000, 180, 72, 15000]),
+    width: 1.5, arcType: Cesium.ArcType.NONE,
+    material: new Cesium.PolylineDashMaterialProperty({ color: Cesium.Color.fromCssColorString("#8fa3b3").withAlpha(0.8), dashLength: 8 }),
+  }});
+  const labelStyle = (text, size) => ({
+    text, font: `700 ${size}px 'Arimo', Arial, sans-serif`, fillColor: Cesium.Color.WHITE,
+    outlineColor: Cesium.Color.BLACK, outlineWidth: 3, style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+    pixelOffset: new Cesium.Cartesian2(0, -18),
+  });
+  viewer.entities.add({ position: Cesium.Cartesian3.fromDegrees(180, 72, 20000), label: { ...labelStyle("TIMEZONE", 12), fillColor: Cesium.Color.fromCssColorString("#8fa3b3") } });
+  R.forEach((p, i) => {
+    const isCity = !!p.label;
+    viewer.entities.add({
+      position: Cesium.Cartesian3.fromDegrees(p.lon, p.lat, 20000),
+      point: { pixelSize: isCity ? 9 : 7, color: isCity ? Cesium.Color.WHITE : Cesium.Color.fromCssColorString("#ffd24a"), outlineColor: Cesium.Color.BLACK, outlineWidth: 2 },
+      label: labelStyle(isCity ? p.label : (i < N ? `${String(i + 1).padStart(2, "0")}` : ""), isCity ? 16 : 13),
+    });
+  });
+
+  const planeSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><path d="M32 2c2.4 0 3.6 3 3.6 7v14l22 13v6l-22-6.5v13l6 5v4.5L32 54l-9.6 3v-4.5l6-5v-13L6.4 42v-6l22-13V9c0-4 1.2-7 3.6-7z" fill="#ffffff" stroke="#000" stroke-width="2"/></svg>`;
+  const axis = new Cesium.Cartesian3();
+  viewer.entities.add({
+    position: new Cesium.CallbackProperty(() => posAt(S.leg, legFrac()), false),
+    billboard: {
+      image: "data:image/svg+xml;base64," + btoa(planeSvg), width: 42, height: 42,
+      alignedAxis: new Cesium.CallbackProperty(() => axis, false),
+      disableDepthTestDistance: Number.POSITIVE_INFINITY,
+    },
+  });
+
+  // ---------- HUD ----------
+  const $ = id => document.getElementById(id);
+  const tl = $("timeline");
+  CONFIG.tracks.forEach(() => { const d = document.createElement("div"); d.innerHTML = `<span></span><div class="bar"><i></i></div>`; tl.appendChild(d); });
+  const renderTimeline = () => CONFIG.tracks.forEach((tr, i) => { tl.children[i].querySelector("span").textContent = `${String(i + 1).padStart(2, "0")} ${tr.title}`; });
+  renderTimeline();
+  let lastTyped = -1;
+  const base = Date.parse(CONFIG.date + "T00:00:00Z");
+  const days = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+  const fmt = (utcH, off) => {
+    const d = new Date(base + (utcH + off) * 3600e3);
+    return [`${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`,
+            `${days[d.getUTCDay()]} ${d.getUTCDate()} ${d.toLocaleString("en", { month: "short", timeZone: "UTC" }).toUpperCase()}`];
+  };
+  const tzName = o => "UTC" + (o === 0 ? "" : (o > 0 ? "+" : "−") + Math.abs(o));
+  let eventTimer = 0;
+
+  function update() {
+    const f = legFrac(), c = cartoAt(S.leg, f);
+    const lon = Cesium.Math.toDegrees(c.longitude), lonU = unwrappedLon(S.leg, lon);
+
+    // sun clock: sun hour under the plane -> UTC -> globe lighting
+    const [h0, h1] = CONFIG.sunHours[S.leg];
+    const h = h0 + (h1 - h0) * (S.leg === 2 ? smooth(f) : f);
+    const utcH = h - lonU / 15;
+    // extra dimming so night really reads on camera
+    const elev = -Math.cos(((h % 24) / 24) * Math.PI * 2);           // 1 = noon, -1 = midnight
+    const night = Cesium.Math.clamp((0.2 - elev) / 0.45, 0, 1);
+    const layer = viewer.imageryLayers.get(0);
+    if (layer) layer.brightness = 1 - 0.72 * night;
+    scene.skyAtmosphere.brightnessShift = -0.6 * night;
+    document.body.style.setProperty("--night", night.toFixed(3));   // cabin gets darker too
+    viewer.clock.currentTime = Cesium.JulianDate.addHours(Cesium.JulianDate.fromIso8601(CONFIG.date + "T00:00:00Z"), utcH, new Cesium.JulianDate());
+
+    // heading of travel
+    const pA = posAt(S.leg, Math.min(f, 0.997)), pB = posAt(S.leg, Math.min(f, 0.997) + 0.003);
+    Cesium.Cartesian3.normalize(Cesium.Cartesian3.subtract(pB, pA, axis), axis);
+    const enu = Cesium.Transforms.eastNorthUpToFixedFrame(pA);
+    const local = Cesium.Matrix4.multiplyByPointAsVector(Cesium.Matrix4.inverse(enu, new Cesium.Matrix4()), axis, new Cesium.Cartesian3());
+    const heading = Math.atan2(local.x, local.y);
+
+    if (S.follow) {
+      if (S.camHeading === null) S.camHeading = heading;
+      const d = Cesium.Math.negativePiToPi(heading - S.camHeading);
+      S.camHeading += d * 0.04;
+      viewer.camera.lookAt(posAt(S.leg, f), new Cesium.HeadingPitchRange(S.camHeading + S.yaw, Cesium.Math.toRadians(S.pitch), S.range));
+    }
+
+    // date line event
+    if (!S.dateline && lonU < -180) { S.dateline = true; eventTimer = 4.5; }
+
+    // HUD text
+    const localTz = Math.round(((lon + 540) % 360 - 180) / 15);
+    const dest = fmt(utcH, 9), loc = fmt(utcH, localTz), orig = fmt(utcH, -4);
+    $("tDest").textContent = dest[0]; $("dDest").textContent = "Seoul · " + dest[1];
+    $("tLocal").textContent = loc[0]; $("dLocal").textContent = tzName(localTz) + " · " + loc[1];
+    $("tOrig").textContent = orig[0]; $("dOrig").textContent = "Pittsburgh · " + orig[1];
+    const hgt = heightAt(S.leg, f);
+    $("alt").textContent = Math.round(hgt * 3.28084).toLocaleString("en") + " ft";
+    $("spd").textContent = Math.round(hgt < 5 ? 0 : 280 + 625 * (hgt / CONFIG.cruiseMeters)) + " km/h";
+    const flown = legLen.slice(0, S.leg).reduce((a, b) => a + b, 0) + legLen[S.leg] * f;
+    $("dist").textContent = Math.round((totalLen - flown) / 1000).toLocaleString("en") + " km";
+
+    const ph = phase(), tp = ph === "track" ? trackProg() : ph === "done" ? 1 : 0;
+    $("nowLabel").textContent = (ph === "announce" ? "Up next" : "Now playing") + ` · ${S.leg + 1} / ${N}`;
+    $("nowTitle").textContent = CONFIG.tracks[S.leg].title;
+    $("nowBar").style.width = tp * 100 + "%";
+    [...tl.children].forEach((el, i) => {
+      el.querySelector("i").style.width = (i < S.leg ? 100 : i === S.leg ? tp * 100 : 0) + "%";
+      el.classList.toggle("on", i === S.leg);
+    });
+
+    // typewriter caption
+    const box = $("announce"), auto = S.stage === "flight" && ph === "announce";
+    box.classList.toggle("show", auto || S.annManual);
+    $("sub").classList.toggle("show", auto);
+    if (auto) {
+      // find which subtitle line we're on, then how many of its letters are typed
+      const lines = annLines(S.leg);
+      let t = S.tau - 0.6, li = 0;
+      while (li < lines.length - 1 && t >= lineDur(lines[li])) { t -= lineDur(lines[li]); li++; }
+      const line = lines[li], n = Math.min(line.length, Math.max(0, Math.floor(t * CONFIG.typeCharsPerSec)));
+      const key = S.leg * 1e6 + li * 1000 + n;
+      if (key !== lastTyped) { lastTyped = key; $("capOn").textContent = line.slice(0, n); $("capOff").textContent = line.slice(n); }
+    }
+    // intro + arrival cards
+    $("intro").classList.toggle("show", S.stage === "intro");
+    $("cta").hidden = S.playing;
+    $("arrive").classList.toggle("show", S.stage === "arrived");
+    if (S.stage === "arrived") $("arriveTime").textContent = `Local time ${dest[0]} · ${dest[1]}`;
+    $("event").classList.toggle("show", eventTimer > 0);
+  }
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min((now - last) / 1000, 0.25); last = now;
+    if (eventTimer > 0) eventTimer -= dt;
+    // turbulence on leg 4 (No Horizon): builds through the song, settles at the end
+    let shake = 0;
+    if (S.stage === "flight" && S.leg === 3) {
+      const A = annDur(3), x = (S.tau - A * 0.5) / (legDur(3) - A * 0.5);
+      if (x > 0 && x < 1) shake = CONFIG.turbulence * Math.sin(Math.PI * Math.pow(x, 1.6)) * (0.6 + 0.4 * Math.sin(now / 340));
+    }
+    const sc = document.getElementById("pov");
+    sc.style.transform = shake > 0.01 ? `scale(1.02) translate(${((Math.random() - 0.5) * 9 * shake).toFixed(1)}px, ${((Math.random() - 0.5) * 7 * shake).toFixed(1)}px) rotate(${((Math.random() - 0.5) * 0.35 * shake).toFixed(2)}deg)` : "";
+
+    if (S.playing && S.stage === "intro") {
+      S.introT += dt;
+      if (S.introT >= CONFIG.introSeconds) S.stage = "flight";
+    } else if (S.playing && !S.done) {
+      const A = annDur(S.leg), a = audios[S.leg];
+      if (S.tau >= A && a && !a.paused) S.tau = A + a.currentTime;   // the song is the clock
+      else S.tau += dt;
+      if (a && a.ended) S.tau = legDur(S.leg);
+      if (S.tau >= legDur(S.leg)) {
+        if (S.leg < N - 1) { S.tau -= legDur(S.leg); S.leg++; }
+        else { S.tau = legDur(S.leg); S.done = true; S.playing = false; S.stage = "arrived"; }
+      }
+    }
+    syncAudio();
+    update();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  function syncAudio() {
+    audios.forEach((a, i) => {
+      if (!a) return;
+      const want = S.playing && S.stage === "flight" && !S.done && i === S.leg && S.tau >= annDur(i) && !a.ended;
+      if (want && a.paused) { a.currentTime = Math.max(0, S.tau - annDur(i)); a.play().catch(() => {}); }
+      else if (!want && !a.paused) a.pause();
+    });
+  }
+  function loadFiles(files) {
+    const list = [...files].filter(f => f.type.startsWith("audio") || /\.(mp3|wav|m4a|aac|flac|ogg)$/i.test(f.name))
+      .sort((x, y) => x.name.localeCompare(y.name, undefined, { numeric: true })).slice(0, N);
+    if (!list.length) return;
+    list.forEach((f, i) => {
+      if (audios[i]) audios[i].pause();
+      audios[i] = makeAudio(URL.createObjectURL(f));
+      if (/^Track \d+$/.test(CONFIG.tracks[i].title))
+        CONFIG.tracks[i].title = f.name.replace(/\.[^.]+$/, "").replace(/^\s*\d+\s*[-_.]*\s*/, "") || CONFIG.tracks[i].title;
+    });
+    renderTimeline(); jump(0, true); S.playing = false;
+  }
+  // viewers on a website: one click on the intro starts the flight (and unlocks audio)
+  document.addEventListener("click", () => { if (S.stage === "intro" && !S.playing) S.playing = true; });
+  $("songPicker").addEventListener("change", e => loadFiles(e.target.files));
+  window.addEventListener("dragover", e => e.preventDefault());
+  window.addEventListener("drop", e => { e.preventDefault(); loadFiles(e.dataTransfer.files); });
+  songStatus();
+
+  // follow cam: drag = orbit around the plane, scroll = zoom, double-click = reset angle
+  const cvs = viewer.canvas, ctrl = scene.screenSpaceCameraController;
+  ctrl.enableInputs = false;
+  let drag = null;
+  cvs.addEventListener("pointerdown", e => { if (S.follow) { drag = { x: e.clientX, y: e.clientY }; cvs.setPointerCapture(e.pointerId); } });
+  cvs.addEventListener("pointermove", e => {
+    if (!drag || !S.follow) return;
+    S.yaw -= (e.clientX - drag.x) * 0.005;
+    S.pitch = Cesium.Math.clamp(S.pitch - (e.clientY - drag.y) * 0.2, -89, -2);
+    drag = { x: e.clientX, y: e.clientY };
+  });
+  cvs.addEventListener("pointerup", () => { drag = null; });
+  cvs.addEventListener("wheel", e => {
+    if (!S.follow) return;
+    e.preventDefault();
+    S.range = Cesium.Math.clamp(S.range * Math.exp(e.deltaY * 0.0015), 2e5, 2.5e7);
+  }, { passive: false });
+  cvs.addEventListener("dblclick", () => { S.yaw = 0; S.pitch = CONFIG.camPitchDeg; S.range = CONFIG.camRangeMeters; });
+
+  function jump(leg, intro) {
+    S.stage = intro ? "intro" : "flight"; S.introT = 0;
+    S.leg = leg; S.tau = 0; S.done = false; S.dateline = leg > 2; S.camHeading = null; lastTyped = -1;
+    audios.forEach(a => { if (a) { a.pause(); a.currentTime = 0; } });
+  }
+  function act(a) {
+    if (a === "play") { if (S.done) jump(0, true); S.playing = !S.playing; }
+    else if (a === "next") { if (S.stage === "intro") jump(0); else if (S.leg < N - 1) jump(S.leg + 1); }
+    else if (a === "prev") { if (S.stage === "flight" && S.tau < 3 && S.leg > 0) jump(S.leg - 1); else jump(S.leg, S.leg === 0 && S.stage !== "flight"); }
+    else if (a === "view") { document.body.classList.toggle("flat"); fit(); }
+    else if (a === "cam") { S.follow = !S.follow; ctrl.enableInputs = !S.follow; if (!S.follow) viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY); else S.camHeading = null; }
+    else if (a === "full") { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => {}); }
+  }
+  document.querySelectorAll(".rb").forEach(b => b.addEventListener("click", e => { e.stopPropagation(); act(b.dataset.act); b.blur(); }));
+  setInterval(() => { $("rb-play").classList.toggle("playing", S.playing); $("rb-cam").classList.toggle("on", !S.follow); }, 150);
+
+  document.addEventListener("keydown", e => {
+    const k = e.key.toLowerCase();
+    if (k === " ") { e.preventDefault(); act("play"); }
+    else if (k >= "1" && k <= "5") jump(+k - 1);
+    else if (k === "a") S.annManual = !S.annManual;
+    else if (k === "r") { jump(0, true); S.playing = false; }
+    else if (k === "o") $("songPicker").click();
+    else if (k === "p") act("view");
+    else if (k === "c") act("cam");
+    else if (k === "f") act("full");
+    else if (k === "arrowright") act("next");
+    else if (k === "arrowleft") act("prev");
+  });
+
+  window.__S = S; // for debugging in the console
+})();
+</script>
+</body>
+</html>
