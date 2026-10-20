@@ -91,6 +91,10 @@ body { -webkit-user-select: none; user-select: none; }
 #volHud .segs i { display: block; width: 14px; height: 22px; border-radius: 2px; background: rgba(150,185,210,0.18); }
 #volHud .segs i.on { background: #5f8dff; }
 
+/* upright phones: the screen is too small, so ask people to turn the phone sideways */
+#rotateHint { display: none; position: fixed; z-index: 66; left: 50%; bottom: calc(18% + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); padding: 10px 18px; border-radius: 999px; background: rgba(8,10,16,0.85); border: 1px solid #26365e; color: #9bb8ff; font: 700 13px/1.2 "Arimo", Arial, sans-serif; letter-spacing: 0.12em; text-transform: uppercase; white-space: nowrap; pointer-events: none; }
+@media (orientation: portrait) and (max-width: 700px) { #rotateHint { display: block; } }
+
 /* in flat mode the seat (and its remote) is gone, so a small back button shows when you move the mouse */
 #flatBack { position: fixed; z-index: 65; top: calc(18px + env(safe-area-inset-top, 0px)); right: calc(18px + env(safe-area-inset-right, 0px)); display: none; opacity: 0; transition: opacity .3s; }
 #flatBack svg { width: 48px; height: 48px; padding: 12px; background: rgba(8,10,16,0.8); }
@@ -139,6 +143,17 @@ body.flat #ports, body.flat #seat, body.flat .remote, body.flat #screen::after {
 .card .eyebrow { font-family: var(--mono); font-size: 16px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--dim); }
 .card h2 { margin: 0; font-family: var(--title); font-weight: var(--title-w); font-size: 120px; line-height: 0.95; letter-spacing: 0.02em; color: var(--title-fill); -webkit-text-stroke: calc(var(--title-stroke) * 6px) #000; paint-order: stroke fill; text-shadow: var(--title-glow); filter: var(--title-blur); }
 .card .by { font-family: var(--sans); font-size: 26px; color: var(--ink); }
+.card .note { margin: 0; max-width: 1000px; font: 400 24px/1.55 var(--sans); color: var(--ink); text-align: left; }
+.card .eta { display: flex; align-items: baseline; gap: 14px; margin-top: 10px; }
+.card .eta span { font: 700 14px/1 var(--sans); letter-spacing: 0.2em; text-transform: uppercase; color: var(--dim); }
+.card .eta b { font: 700 30px/1 var(--sans); color: var(--ink); font-variant-numeric: tabular-nums; }
+.card .howto { display: flex; gap: 14px; margin: 14px 0 0; padding: 0; list-style: none; }
+.card .howto li { padding: 8px 16px; border: 1px solid var(--line); border-radius: 999px; font: 700 15px/1 var(--sans); letter-spacing: 0.06em; color: var(--flown); }
+.card button.go { all: unset; cursor: pointer; pointer-events: auto; margin-top: 26px; padding: 12px 34px; border: 1px solid var(--line); border-radius: 999px; font: 700 15px/1 var(--sans); letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink); animation: none; }
+.card button.go:hover, .card button.go:focus-visible { border-color: var(--flown); color: var(--flown); }
+.card:not(.show) button.go { pointer-events: none; }
+.card .sig { margin-top: 6px; font: 400 15px/1 var(--sans); letter-spacing: 0.12em; color: var(--dim); }
+#about { gap: 18px; background: radial-gradient(ellipse at 50% 45%, rgba(10,18,30,0.92) 0%, rgba(3,6,11,0.98) 75%); }
 .card .stream { margin-top: 18px; pointer-events: auto; font: 700 14px/1 var(--sans); letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim); text-decoration: none; border-bottom: 1px solid currentColor; padding-bottom: 3px; }
 .card .stream:hover, .card .stream:focus-visible { color: var(--ink); outline: none; }
 .card:not(.show) .stream { pointer-events: none; }
@@ -190,7 +205,18 @@ body.flat #sub { bottom: 24vh; }
         <div class="bar"><i id="nowBar"></i></div>
       </div>
 
-      <div id="intro" class="card show">
+      <div id="about" class="card show">
+        <div class="eyebrow">A note before you board</div>
+        <p class="note">NON-PLACE is a concept album set on one long flight home across timezones. A non-place, a term from anthropologist Marc Aug&eacute;, is a transient space like an airport or a cabin, where you feel detached, anonymous, and strangely familiar all at once. The album follows the flight from boarding to landing, day to night, while I try to hold onto the memories of the city I left as they fade like a dream. Each song is a persona that only exists at one point in the trip, narrated by cabin announcements.</p>
+        <div class="eta"><span>Estimated time of arrival</span><b>10 min</b></div>
+        <ul class="howto">
+          <li>Sound on, headphones recommended</li>
+          <li>Buttons beside the screen: pause, skip, volume</li>
+        </ul>
+        <button type="button" class="cta go" id="aboutGo">Continue</button>
+        <div class="sig">Ritta Kim (R!iTTA)</div>
+      </div>
+      <div id="intro" class="card">
         <div class="eyebrow">Welcome aboard &middot; 탑승을 환영합니다</div>
         <h2>NON-PLACE</h2>
         <div class="by">R!iTTA</div>
@@ -214,7 +240,7 @@ body.flat #sub { bottom: 24vh; }
 
       <div id="stats" class="hud panel">
         <div><div class="label">Time at destination</div><div class="v" id="tDest">--:--</div><div class="s" id="dDest">Seoul</div></div>
-        <div><div class="label">Local time</div><div class="v" id="tLocal">--:--</div><div class="s" id="dLocal">UTC</div></div>
+        <div><div class="label">Time to next leg</div><div class="v" id="tLocal">--:--</div><div class="s" id="dLocal">&nbsp;</div></div>
         <div><div class="label">Time at origin</div><div class="v" id="tOrig">--:--</div><div class="s" id="dOrig">Pittsburgh</div></div>
         <div><div class="label">Altitude</div><div class="v" id="alt">0 ft</div><div class="s">&nbsp;</div></div>
         <div><div class="label">Ground speed</div><div class="v" id="spd">0 km/h</div><div class="s">&nbsp;</div></div>
@@ -228,6 +254,7 @@ body.flat #sub { bottom: 24vh; }
 </div>
 <div id="vignette"></div>
 <div id="fontToast"></div>
+<div id="rotateHint">&#8635;&nbsp; Rotate your phone for the best view</div>
 <button type="button" class="rb" id="flatBack" data-act="view" aria-label="Back to seat view"><svg viewBox="0 0 24 24"><path d="M3 5h18v12H3zM5 7v8h14V7zM9 19h6v1.5H9z"/></svg><span>Seat view</span></button>
 <div id="sub"><span id="capOn"></span><span id="capOff"></span></div>
 <div id="grain"></div>
@@ -268,17 +295,14 @@ const CONFIG = {
   // in-flight events per track. at = how far into the song (0 = start, 1 = end)
   // fx: "rumble" = short shake (seconds = how long). text shows as a banner on the screen
   events: [
-    [ // 1 BAAM: boarding, airplane mode, taxi, takeoff roll
-      { at: 0.16, text: "BOARDING COMPLETE · 탑승 완료" },
-      { at: 0.34, text: "PLEASE SWITCH TO AIRPLANE MODE" },
-      { at: 0.52, text: "TAXIING TO RUNWAY 28R" },
-      { at: 0.74, text: "CLEARED FOR TAKEOFF" },
-      { at: 0.80, fx: "rumble", seconds: 9 },
+    [ // 1 BAAM: lift off after the welcome announcement
+      { at: 0.13, text: "TAKEOFF · 이륙", fx: "rumble", seconds: 7 },
+      { at: 0.30, text: "LANDING GEAR UP" },
+      { at: 0.55, text: "AIRPLANE MODE ON" },
     ],
-    [ // 2 TakeOFF: lift off, city shrinks (camera pulls back), climb
-      { at: 0.03, text: "TAKEOFF · 이륙", fx: "rumble", seconds: 6 },
-      { at: 0.22, text: "LANDING GEAR UP" },
-      { at: 0.45, text: "CLIMBING · 상승 중" },
+    [ // 2 TakeOFF: city shrinks (camera pulls back), climb to cruise
+      { at: 0.10, fx: "rumble", seconds: 4 },
+      { at: 0.35, text: "CLIMBING · 상승 중" },
       { at: 0.62, fx: "rumble", seconds: 4 },
       { at: 0.82, text: "CRUISING ALTITUDE · SEATBELT SIGN OFF" },
     ],
@@ -294,8 +318,6 @@ const CONFIG = {
     [ // 5 Reverse Homesickness: sunrise, descent, landing
       { at: 0.15, text: "SUNRISE" },
       { at: 0.45, text: "DESCENDING INTO INCHEON · 하강 중" },
-      { at: 0.70, text: "LANDING GEAR DOWN" },
-      { at: 0.90, text: "TOUCHDOWN", fx: "rumble", seconds: 3 },
     ],
   ],
   introSeconds: 0.6,                   // tiny pause after "Click to board" before the first beep (the title fades out meanwhile)
@@ -412,9 +434,9 @@ addEventListener("resize", fit); fit();
   function heightAt(leg, f) {
     const c = CONFIG.cruiseMeters;
     const ease = x => { x = Cesium.Math.clamp(x, 0, 1); return x * x * (3 - 2 * x); };
-    if (leg === 0) return f < 0.8 ? 0 : 3048 * ease((f - 0.8) / 0.2);          // BAAM: taxi, lift off near the end, up to 10,000 ft
-    if (leg === 1) return 3048 + (c - 3048) * ease(f / 0.8);                     // TakeOFF: climb to cruise
-    if (leg === N - 1 && f > 0.85) return c * Cesium.Math.clamp((1 - f) / 0.15, 0, 1);
+    if (leg === 0) return 4572 * ease(f / 0.3);                                 // BAAM: lifts off after the welcome announcement, up to 15,000 ft
+    if (leg === 1) return 4572 + (c - 4572) * ease(f / 0.8);                     // TakeOFF: keeps climbing to cruise
+    if (leg === N - 1) return c * (1 - ease((f - 0.25) / 0.65));                // Reverse Homesickness: descend through the song, wheels down by 90%
     return c;
   }
   function cartoAt(leg, f) { return legs[leg].interpolateUsingFraction(Cesium.Math.clamp(f, 0, 1)); }
@@ -429,7 +451,7 @@ addEventListener("resize", fit); fit();
   const fullRoute = legPts.flatMap((pts, i) => (i ? pts.slice(1) : pts));
 
   // ---------- state ----------
-  const S = { stage: "intro", introT: 0, leg: 0, tau: 0, done: false, playing: false, annManual: false, follow: true, dateline: false, camHeading: null,
+  const S = { stage: "about", introT: 0, leg: 0, tau: 0, done: false, playing: false, annManual: false, follow: true, dateline: false, camHeading: null,
              yaw: 0, pitch: CONFIG.camPitchDeg, range: CONFIG.camRangeMeters };
 
   // each leg = [announcement (slow)] + [song (normal speed)]. leg 1 has no announcement
@@ -594,11 +616,14 @@ addEventListener("resize", fit); fit();
     const localTz = Math.round(((lon + 540) % 360 - 180) / 15);
     const dest = fmt(utcH, 9), loc = fmt(utcH, localTz), orig = fmt(utcH, -4);
     $("tDest").textContent = dest[0]; $("dDest").textContent = "Seoul · " + dest[1];
-    $("tLocal").textContent = loc[0]; $("dLocal").textContent = tzName(localTz) + " · " + loc[1];
+    // countdown to the end of this leg (= end of the current song)
+    const left = S.stage === "flight" && !S.done ? Math.max(0, legDur(S.leg) - S.tau) : (S.done ? 0 : legDur(0));
+    $("tLocal").textContent = `${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, "0")}`;
+    $("dLocal").textContent = S.done ? "Arrived" : S.leg < N - 1 ? "Next: " + CONFIG.tracks[S.leg + 1].title : "Arrival · Seoul";
     $("tOrig").textContent = orig[0]; $("dOrig").textContent = "Pittsburgh · " + orig[1];
     const hgt = heightAt(S.leg, f);
     $("alt").textContent = Math.round(hgt * 3.28084).toLocaleString("en") + " ft";
-    const gs = S.leg === 0 && hgt < 5 ? (f < 0.02 ? 0 : f < 0.74 ? 28 : 28 + 250 * (f - 0.74) / 0.06)
+    const gs = S.leg === 0 && hgt < 5 ? 0
              : S.leg === N - 1 && hgt < 5 ? (S.done || f >= 0.999 ? 0 : 60)        // rolled out after touchdown
              : 280 + 625 * (hgt / CONFIG.cruiseMeters);
     $("spd").textContent = Math.round(gs) + " km/h";
@@ -628,6 +653,7 @@ addEventListener("resize", fit); fit();
       if (key !== lastTyped) { lastTyped = key; $("capOn").textContent = line.slice(0, n); $("capOff").textContent = line.slice(n); }
     }
     // intro + arrival cards
+    $("about").classList.toggle("show", S.stage === "about");
     $("intro").classList.toggle("show", S.stage === "intro");
     $("cta").hidden = S.playing;
     $("arrive").classList.toggle("show", S.stage === "arrived");
@@ -699,6 +725,7 @@ addEventListener("resize", fit); fit();
     renderTimeline(); jump(0, true); S.playing = false;
   }
   document.querySelectorAll(".stream").forEach(a => a.addEventListener("click", e => e.stopPropagation()));
+  $("aboutGo").addEventListener("click", e => { e.stopPropagation(); S.stage = "intro"; $("aboutGo").blur(); });
   // viewers on a website: one click on the intro starts the flight (and unlocks audio)
   document.addEventListener("click", () => { if (S.stage === "intro" && !S.playing) S.playing = true; });
   $("songPicker").addEventListener("change", e => loadFiles(e.target.files));
@@ -743,7 +770,7 @@ addEventListener("resize", fit); fit();
   function act(a) {
     if (a === "volup") return setVol(VOL + 0.1);
     if (a === "voldown") return setVol(VOL - 0.1);
-    if (a === "play") { if (S.done) jump(0, true); S.playing = !S.playing; }
+    if (a === "play") { if (S.stage === "about") { S.stage = "intro"; return; } if (S.done) jump(0, true); S.playing = !S.playing; }
     else if (a === "next") { if (S.stage === "intro") jump(0); else if (S.leg < N - 1) jump(S.leg + 1); }
     else if (a === "prev") { if (S.stage === "flight" && S.tau < 3 && S.leg > 0) jump(S.leg - 1); else jump(S.leg, S.leg === 0 && S.stage !== "flight"); }
     else if (a === "view") { document.body.classList.toggle("flat"); fit(); }
