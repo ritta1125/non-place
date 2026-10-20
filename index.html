@@ -144,11 +144,12 @@ body.flat #ports, body.flat #seat, body.flat .remote, body.flat #screen::after {
 .card h2 { margin: 0; font-family: var(--title); font-weight: var(--title-w); font-size: 120px; line-height: 0.95; letter-spacing: 0.02em; color: var(--title-fill); -webkit-text-stroke: calc(var(--title-stroke) * 6px) #000; paint-order: stroke fill; text-shadow: var(--title-glow); filter: var(--title-blur); }
 .card .by { font-family: var(--sans); font-size: 26px; color: var(--ink); }
 .card .note { margin: 0; max-width: 1000px; font: 400 24px/1.55 var(--sans); color: var(--ink); text-align: left; }
+.card .howto li svg { width: 18px; height: 18px; flex: none; fill: currentColor; }
 .card .eta { display: flex; align-items: baseline; gap: 14px; margin-top: 10px; }
 .card .eta span { font: 700 14px/1 var(--sans); letter-spacing: 0.2em; text-transform: uppercase; color: var(--dim); }
 .card .eta b { font: 700 30px/1 var(--sans); color: var(--ink); font-variant-numeric: tabular-nums; }
 .card .howto { display: flex; gap: 14px; margin: 14px 0 0; padding: 0; list-style: none; }
-.card .howto li { padding: 8px 16px; border: 1px solid var(--line); border-radius: 999px; font: 700 15px/1 var(--sans); letter-spacing: 0.06em; color: var(--flown); }
+.card .howto li { display: flex; align-items: center; gap: 9px; padding: 8px 16px; border: 1px solid var(--line); border-radius: 999px; font: 700 15px/1 var(--sans); letter-spacing: 0.06em; color: var(--flown); }
 .card button.go { all: unset; cursor: pointer; pointer-events: auto; margin-top: 26px; padding: 12px 34px; border: 1px solid var(--line); border-radius: 999px; font: 700 15px/1 var(--sans); letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink); animation: none; }
 .card button.go:hover, .card button.go:focus-visible { border-color: var(--flown); color: var(--flown); }
 .card:not(.show) button.go { pointer-events: none; }
@@ -192,7 +193,7 @@ body.flat #sub { bottom: 24vh; }
   <div id="rig">
     <div id="seat"><div class="placard">LIFE VEST UNDER YOUR SEAT &middot; 구명복은 좌석 밑에 있습니다</div></div>
     <div class="remote" id="remoteL"><button type="button" class="rb" data-act="prev" id="rb-prev" aria-label="Prev"><svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg><span>Prev</span></button><button type="button" class="rb" data-act="play" id="rb-play" aria-label="Play"><svg viewBox="0 0 24 24"><path class="ic-play" d="M8 5v14l11-7z"/><path class="ic-pause" d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg><span>Play</span></button><button type="button" class="rb" data-act="next" id="rb-next" aria-label="Next"><svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg><span>Next</span></button></div>
-    <div class="remote" id="remoteR"><button type="button" class="rb" data-act="volup" id="rb-volup" aria-label="Volume up"><svg viewBox="0 0 24 24"><path d="M3 9h4l5-4v14l-5-4H3zM17 11h2V9h2v2h2v2h-2v2h-2v-2h-2z"/></svg><span>Vol +</span></button><button type="button" class="rb" data-act="voldown" id="rb-voldown" aria-label="Volume down"><svg viewBox="0 0 24 24"><path d="M3 9h4l5-4v14l-5-4H3zM16 11h7v2h-7z"/></svg><span>Vol −</span></button><button type="button" class="rb" data-act="view" id="rb-view" aria-label="View"><svg viewBox="0 0 24 24"><path d="M3 5h18v12H3zM5 7v8h14V7zM9 19h6v1.5H9z"/></svg><span>View</span></button><button type="button" class="rb" data-act="cam" id="rb-cam" aria-label="Cam"><svg viewBox="0 0 24 24"><path d="M12 4l2.5 5H9.5zM12 20l-2.5-5h5zM4 12l5-2.5v5zM20 12l-5 2.5v-5z"/><circle cx="12" cy="12" r="2"/></svg><span>Cam</span></button><button type="button" class="rb" data-act="full" id="rb-full" aria-label="Full"><svg viewBox="0 0 24 24"><path d="M4 4h6v2H6v4H4zM20 4v6h-2V6h-4V4zM4 20v-6h2v4h4v2zM20 20h-6v-2h4v-4h2z"/></svg><span>Full</span></button></div>
+    <div class="remote" id="remoteR"><button type="button" class="rb" data-act="volup" id="rb-volup" aria-label="Volume up"><svg viewBox="0 0 24 24"><path d="M3 9h4l5-4v14l-5-4H3zM17 11h2V9h2v2h2v2h-2v2h-2v-2h-2z"/></svg><span>Vol +</span></button><button type="button" class="rb" data-act="voldown" id="rb-voldown" aria-label="Volume down"><svg viewBox="0 0 24 24"><path d="M3 9h4l5-4v14l-5-4H3zM16 11h7v2h-7z"/></svg><span>Vol −</span></button><button type="button" class="rb" data-act="view" id="rb-view" aria-label="View"><svg viewBox="0 0 24 24"><path d="M3 5h18v12H3zM5 7v8h14V7zM9 19h6v1.5H9z"/></svg><span>View</span></button><button type="button" class="rb" data-act="cam" id="rb-cam" aria-label="Switch camera angle"><svg viewBox="0 0 24 24"><path d="M12 3c4.6 0 8.6 3 10 7-1.4 4-5.4 7-10 7S3.4 14 2 10c1.4-4 5.4-7 10-7zm0 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm0 2.2a1.8 1.8 0 1 1 0 3.6 1.8 1.8 0 0 1 0-3.6zM7 19h10v2H7z"/></svg><span>Angle</span></button><button type="button" class="rb" data-act="full" id="rb-full" aria-label="Full"><svg viewBox="0 0 24 24"><path d="M4 4h6v2H6v4H4zM20 4v6h-2V6h-4V4zM4 20v-6h2v4h4v2zM20 20h-6v-2h4v-4h2z"/></svg><span>Full</span></button></div>
     <div id="bezel">
       <div id="screen">
       <div id="globe"></div>
@@ -210,8 +211,8 @@ body.flat #sub { bottom: 24vh; }
         <p class="note">NON-PLACE is a concept album set on one long flight home across timezones. A non-place, a term from anthropologist Marc Aug&eacute;, is a transient space like an airport or a cabin, where you feel detached, anonymous, and strangely familiar all at once. The album follows the flight from boarding to landing, day to night, while I try to hold onto the memories of the city I left as they fade like a dream. Each song is a persona that only exists at one point in the trip, narrated by cabin announcements.</p>
         <div class="eta"><span>Estimated time of arrival</span><b>10 min</b></div>
         <ul class="howto">
-          <li>Sound on, headphones recommended</li>
-          <li>Buttons beside the screen: pause, skip, volume</li>
+          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 0 0-9 9v6a3 3 0 0 0 3 3h1a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2H5v-1a7 7 0 0 1 14 0v1h-2a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h1a3 3 0 0 0 3-3v-6a9 9 0 0 0-9-9z"/></svg>Sound on, headphones recommended</li>
+          <li><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4"/></svg>Interact with the buttons beside the screen</li>
         </ul>
         <button type="button" class="cta go" id="aboutGo">Continue</button>
         <div class="sig">Ritta Kim (R!iTTA)</div>
@@ -240,8 +241,8 @@ body.flat #sub { bottom: 24vh; }
 
       <div id="stats" class="hud panel">
         <div><div class="label">Time at destination</div><div class="v" id="tDest">--:--</div><div class="s" id="dDest">Seoul</div></div>
-        <div><div class="label">Time to next leg</div><div class="v" id="tLocal">--:--</div><div class="s" id="dLocal">&nbsp;</div></div>
         <div><div class="label">Time at origin</div><div class="v" id="tOrig">--:--</div><div class="s" id="dOrig">Pittsburgh</div></div>
+        <div><div class="label">Time to next leg</div><div class="v" id="tLocal">--:--</div><div class="s" id="dLocal">&nbsp;</div></div>
         <div><div class="label">Altitude</div><div class="v" id="alt">0 ft</div><div class="s">&nbsp;</div></div>
         <div><div class="label">Ground speed</div><div class="v" id="spd">0 km/h</div><div class="s">&nbsp;</div></div>
         <div><div class="label">Distance to dest.</div><div class="v" id="dist">-- km</div><div class="s">&nbsp;</div></div>
@@ -297,7 +298,6 @@ const CONFIG = {
   events: [
     [ // 1 BAAM: lift off after the welcome announcement
       { at: 0.13, text: "TAKEOFF · 이륙", fx: "rumble", seconds: 7 },
-      { at: 0.30, text: "LANDING GEAR UP" },
       { at: 0.55, text: "AIRPLANE MODE ON" },
     ],
     [ // 2 TakeOFF: city shrinks (camera pulls back), climb to cruise
@@ -308,7 +308,7 @@ const CONFIG = {
     ],
     [ // 3 GMT++ (the date line banner fires on its own when the plane crosses it)
       { at: 0.25, text: "SUNSET · LOCAL TIME CHANGING" },
-      { at: 0.80, text: "CABIN LIGHTS DIMMED" },
+      { at: 0.94, text: "CABIN LIGHTS DIMMED" },   // date line fires around 0.79, so this lands ~30s later
     ],
     [ // 4 No Horizon (the long turbulence is built in)
       { at: 0.15, text: "SEATBELT SIGN ON · 좌석벨트 착용" },
@@ -590,6 +590,8 @@ addEventListener("resize", fit); fit();
     const local = Cesium.Matrix4.multiplyByPointAsVector(Cesium.Matrix4.inverse(enu, new Cesium.Matrix4()), axis, new Cesium.Cartesian3());
     const heading = Math.atan2(local.x, local.y);
 
+    const wantPitch = S.overhead ? -88 : CONFIG.camPitchDeg, wantRange = S.overhead ? CONFIG.camRangeMeters * 1.35 : CONFIG.camRangeMeters;
+    S.pitch += (wantPitch - S.pitch) * 0.05; S.range += (wantRange - S.range) * 0.05;
     if (S.follow) {
       if (S.camHeading === null) S.camHeading = heading;
       const d = Cesium.Math.negativePiToPi(heading - S.camHeading);
@@ -733,24 +735,20 @@ addEventListener("resize", fit); fit();
   window.addEventListener("drop", e => { e.preventDefault(); loadFiles(e.dataTransfer.files); });
   songStatus();
 
-  // follow cam: drag = orbit around the plane, scroll = zoom, double-click = reset angle
+  // camera stays locked to the plane: drag = rotate around it, double-click = reset. no zooming.
+  // the Angle button switches between the chase view (behind the plane) and the overhead view (looking down)
   const cvs = viewer.canvas, ctrl = scene.screenSpaceCameraController;
   ctrl.enableInputs = false;
   let drag = null;
-  cvs.addEventListener("pointerdown", e => { if (S.follow) { drag = { x: e.clientX, y: e.clientY }; cvs.setPointerCapture(e.pointerId); } });
+  cvs.addEventListener("pointerdown", e => { drag = { x: e.clientX }; cvs.setPointerCapture(e.pointerId); });
   cvs.addEventListener("pointermove", e => {
-    if (!drag || !S.follow) return;
+    if (!drag) return;
     S.yaw -= (e.clientX - drag.x) * 0.005;
-    S.pitch = Cesium.Math.clamp(S.pitch - (e.clientY - drag.y) * 0.2, -89, -2);
-    drag = { x: e.clientX, y: e.clientY };
+    drag = { x: e.clientX };
   });
   cvs.addEventListener("pointerup", () => { drag = null; });
-  cvs.addEventListener("wheel", e => {
-    if (!S.follow) return;
-    e.preventDefault();
-    S.range = Cesium.Math.clamp(S.range * Math.exp(e.deltaY * 0.0015), 2e5, 2.5e7);
-  }, { passive: false });
-  cvs.addEventListener("dblclick", () => { S.yaw = 0; S.pitch = CONFIG.camPitchDeg; S.range = CONFIG.camRangeMeters; });
+  cvs.addEventListener("wheel", e => e.preventDefault(), { passive: false });
+  cvs.addEventListener("dblclick", () => { S.yaw = 0; });
 
   function jump(leg, intro) {
     S.stage = intro ? "intro" : "flight"; S.introT = 0;
@@ -774,14 +772,14 @@ addEventListener("resize", fit); fit();
     else if (a === "next") { if (S.stage === "intro") jump(0); else if (S.leg < N - 1) jump(S.leg + 1); }
     else if (a === "prev") { if (S.stage === "flight" && S.tau < 3 && S.leg > 0) jump(S.leg - 1); else jump(S.leg, S.leg === 0 && S.stage !== "flight"); }
     else if (a === "view") { document.body.classList.toggle("flat"); fit(); }
-    else if (a === "cam") { S.follow = !S.follow; ctrl.enableInputs = !S.follow; if (!S.follow) viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY); else S.camHeading = null; }
+    else if (a === "cam") { S.overhead = !S.overhead; }
     else if (a === "full") { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => {}); }
   }
   document.querySelectorAll(".rb").forEach(b => b.addEventListener("click", e => { e.stopPropagation(); act(b.dataset.act); b.blur(); }));
   // wake the back button on mouse move, hide it again after 2.5s so it stays out of your recording
   let wakeTm;
   addEventListener("pointermove", () => { document.body.classList.add("awake"); clearTimeout(wakeTm); wakeTm = setTimeout(() => document.body.classList.remove("awake"), 2500); });
-  setInterval(() => { $("rb-play").classList.toggle("playing", S.playing); $("rb-cam").classList.toggle("on", !S.follow); }, 150);
+  setInterval(() => { $("rb-play").classList.toggle("playing", S.playing); $("rb-cam").classList.toggle("on", !!S.overhead); }, 150);
 
   document.addEventListener("keydown", e => {
     const k = e.key.toLowerCase();
